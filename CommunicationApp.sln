@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunicationApp", "CommunicationApp\CommunicationApp.csproj", "{54D4D2AA-0D8E-4C7E-8ED7-669082531F6C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunicationApi", "CommunicationApi\CommunicationApi.csproj", "{0C9F668C-422F-4ED0-9C27-2BAAAC253986}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{54D4D2AA-0D8E-4C7E-8ED7-669082531F6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{54D4D2AA-0D8E-4C7E-8ED7-669082531F6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{54D4D2AA-0D8E-4C7E-8ED7-669082531F6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{54D4D2AA-0D8E-4C7E-8ED7-669082531F6C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C9F668C-422F-4ED0-9C27-2BAAAC253986}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C9F668C-422F-4ED0-9C27-2BAAAC253986}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C9F668C-422F-4ED0-9C27-2BAAAC253986}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C9F668C-422F-4ED0-9C27-2BAAAC253986}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

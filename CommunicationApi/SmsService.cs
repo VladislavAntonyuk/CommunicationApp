@@ -2,11 +2,10 @@
 
 namespace CommunicationApi;
 
-internal class SmsService(IOptions<Recipient> options):ISender
+internal class SmsService
 {
     public Task Send(string recipient, string text)
     {
-        var recipient = options.Value.Sms;
         return Task.CompletedTask;
     }
 }

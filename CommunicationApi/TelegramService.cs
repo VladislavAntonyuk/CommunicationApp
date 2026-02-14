@@ -1,8 +1,8 @@
 ﻿namespace CommunicationApi;
 
-internal class TelegramService:ISender
+internal class TelegramService
 {
-    public Task Send(string text)
+    public Task Send(string recipient, string text)
     {
         return Task.CompletedTask;
     }

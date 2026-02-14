@@ -2,7 +2,7 @@
 using MailerSendNetCore.Emails.Dtos;
 using Microsoft.Extensions.Options;
 
-namespace CommunicationApi;
+namespace CommunicationApi.Services;
 
 internal class EmailService(IMailerSendEmailClient client, IOptions<EmailSettings> options)
 {

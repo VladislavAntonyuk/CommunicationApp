@@ -1,4 +1,4 @@
-﻿namespace CommunicationApi;
+﻿namespace CommunicationApi.Services;
 
 internal class TelegramService
 {

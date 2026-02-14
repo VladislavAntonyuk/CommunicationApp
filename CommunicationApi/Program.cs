@@ -1,4 +1,6 @@
-using CommunicationApi;
+using CommunicationApi.Database;
+using CommunicationApi.Services;
+using MailerSendNetCore.Common.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Shared;
@@ -7,8 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 
-builder.Services.Configure<Recipient>(builder.Configuration.GetSection("Recipient"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddMailerSendEmailClient(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseInMemoryDatabase("CommunicationApiDb"));
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<TelegramService>();
@@ -52,29 +54,30 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, [FromBody] Message
     {
         case Target.Email:
             var emailService = scope.ServiceProvider.GetRequiredService<EmailService>();
-            await emailService.Send(parts[1], parts[2], parts[3]);
-            break;
+            return Results.Ok(await emailService.Send(parts[1], parts[2], parts[3]));
         case Target.Telegram:
             var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
             await telegramService.Send(parts[1], parts[2]);
-            break;
+            return Results.Ok();
         default:
             throw new ArgumentOutOfRangeException();
     }
 }).WithDescription("Android client sends request to this endpoint.");
 
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Target target, [FromBody] Message message) =>
+{
+    dbContext.Messages.Add(new CommunicationApiMessage
+    {
+        Text = message.Text,
+        DateTime = DateTime.UtcNow,
+        IsRead = false,
+        Target = target
+    });
+    await dbContext.SaveChangesAsync();
+}).WithDescription("Service sends webhooks on this endpoint.");
+
+using var scope = app.Services.CreateScope();
+using var dbContext = scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>();
+dbContext.Database.EnsureCreated();
+
 app.Run();
-
-public class CommunicationApiDbContext(DbContextOptions<CommunicationApiDbContext> options) : DbContext(options)
-{
-    public DbSet<CommunicationApiMessage> Messages => Set<CommunicationApiMessage>();
-}
-
-public class CommunicationApiMessage
-{
-    public int Id { get; set; }
-    public Target Target { get; set; }
-    public required string Text { get; set; }
-    public required DateTime DateTime { get; set; }
-    public required bool IsRead { get; set; }
-}

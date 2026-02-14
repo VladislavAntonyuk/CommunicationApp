@@ -5,7 +5,7 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
-        PhoneNumber.Text = Preferences.Get("recipient", "");
+        PhoneNumber.Text = Preferences.Get("from", "");
     }
 
     private async Task<List<string>> GetMessages()
@@ -60,7 +60,7 @@ public partial class MainPage : ContentPage
 
     private void PhoneNumber_OnTextChanged(object? sender, TextChangedEventArgs e)
     {
-        Preferences.Set("recipient", PhoneNumber.Text);
+        Preferences.Set("from", PhoneNumber.Text);
     }
 
     private async void CallButton_OnClicked(object? sender, EventArgs e)

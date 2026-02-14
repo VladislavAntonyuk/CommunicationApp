@@ -1,6 +1,6 @@
 ﻿namespace CommunicationApi;
 
-internal class EmailService:ISender
+internal class EmailService : ISender
 {
     public Task Send(string text)
     {

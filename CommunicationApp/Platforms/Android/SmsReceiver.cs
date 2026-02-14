@@ -30,11 +30,11 @@ public class SmsReceiver : BroadcastReceiver
                 string? sender = message?.OriginatingAddress;
                 string? body = message?.MessageBody;
 
-                var recipient = Preferences.Get("recipient", null);
-                if (sender == recipient)
+                var from = Preferences.Get("from", null);
+                if (sender == from)
                 {
                     using var httpClient = new HttpClient();
-                    await httpClient.PostAsJsonAsync("https://localhost:7001/send", new Shared.Message(body, Shared.Target.Sms));
+                    await httpClient.PostAsJsonAsync("https://localhost:7001/send", new Shared.Message(body));
                 }
             }
         }

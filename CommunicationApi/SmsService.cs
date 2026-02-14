@@ -1,9 +1,12 @@
-﻿namespace CommunicationApi;
+﻿using Microsoft.Extensions.Options;
 
-internal class SmsService:ISender
+namespace CommunicationApi;
+
+internal class SmsService(IOptions<Recipient> options):ISender
 {
-    public Task Send(string text)
+    public Task Send(string recipient, string text)
     {
+        var recipient = options.Value.Sms;
         return Task.CompletedTask;
     }
 }

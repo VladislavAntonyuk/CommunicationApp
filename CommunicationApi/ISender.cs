@@ -2,5 +2,5 @@
 
 internal interface ISender
 {
-    Task Send(string text);
+    Task Send(string recipient, string text);
 }

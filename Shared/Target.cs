@@ -2,7 +2,6 @@
 
 public enum Target
 {
-    Sms,
     Email,
     Telegram
 }

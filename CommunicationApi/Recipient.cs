@@ -2,5 +2,5 @@
 
 public class Recipient
 {
-    public string PhoneNumber { get; set; }
+    public required string PhoneNumber { get; set; }
 }

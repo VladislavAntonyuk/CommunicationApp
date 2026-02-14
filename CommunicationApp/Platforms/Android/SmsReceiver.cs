@@ -34,7 +34,15 @@ public class SmsReceiver : BroadcastReceiver
                 if (sender == from)
                 {
                     using var httpClient = new HttpClient();
-                    await httpClient.PostAsJsonAsync("https://localhost:7001/send", new Shared.Message(body));
+                    var result = await httpClient.PostAsJsonAsync("https://localhost:7001/send", new Shared.Message(body));
+                    if (result.IsSuccessStatusCode)
+                    {
+                        Toast.MakeText(context, "SMS sent to API successfully!", ToastLength.Short).Show();
+                    }
+                    else
+                    {
+                        Toast.MakeText(context, "Failed to send SMS to API: " + result.ReasonPhrase, ToastLength.Long).Show();
+                    }
                 }
             }
         }

@@ -8,7 +8,7 @@ internal class EmailService(IMailerSendEmailClient client, IOptions<EmailSetting
 {
     public async Task Send(string recipient, string subject, string text)
     {
-        var parameters = new MailerSendEmailParameters()
+        var parameters = new MailerSendEmailParameters
         {
             Text = text
         };

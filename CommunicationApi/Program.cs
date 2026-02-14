@@ -1,3 +1,4 @@
+using CommunicationApi;
 using Microsoft.AspNetCore.Mvc;
 using Shared;
 
@@ -18,45 +19,18 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-
 app.MapGet("/receive", async (IServiceProvider serviceProvider, [FromBody] Message message) =>
     {
         using var scope = serviceProvider.CreateScope();
         var sender = scope.ServiceProvider.GetRequiredKeyedService<ISender>(message.Target);
         await sender.Send(message.Text);
-    });
+    }).WithDescription("This endpoint receives messages from external services and needs to notify Android client about new message.");
 
 app.MapPost("/send", async (IServiceProvider serviceProvider, [FromBody] Message message) =>
     {
         using var scope = serviceProvider.CreateScope();
         var sender = scope.ServiceProvider.GetRequiredKeyedService<ISender>(message.Target);
         await sender.Send(message.Text);
-    });
+    }).WithDescription("Android client sends request to this endpoint.");
 
 app.Run();
-
-interface ISender
-{
-    Task Send(string text);
-}
-class SmsService:ISender
-{
-    public Task Send(string text)
-    {
-        return Task.CompletedTask;
-    }
-}
-class EmailService:ISender
-{
-    public Task Send(string text)
-    {
-        return Task.CompletedTask;
-    }
-}
-class TelegramService:ISender
-{
-    public Task Send(string text)
-    {
-        return Task.CompletedTask;
-    }
-}

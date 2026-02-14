@@ -2,37 +2,36 @@
 
 public partial class MainPage : ContentPage
 {
-    int count = 0;
-
     public MainPage()
     {
         InitializeComponent();
+        PhoneNumber.Text = Preferences.Get("recipient", "");
     }
 
-    private async void OnCounterClicked(object sender, EventArgs e)
+    private async Task<List<string>> GetMessages()
     {
-        var res= await  CheckAndRequestSMSPermission();
-        if (res.Equals( PermissionStatus.Granted))
+        var res = await CheckAndRequestSmsPermission();
+        List<string> items = [];
+        if (res.Equals(PermissionStatus.Granted))
         {
 #if ANDROID
+            string inbox = "content://sms/inbox";
+            string[] reqCols = ["_id", "thread_id", "address", "person", "date", "body", "type"];
+            var uri = Android.Net.Uri.Parse(inbox);
+            var cursor = Platform.CurrentActivity?.ContentResolver?.Query(uri, reqCols, null, null,
+                    null);
 
-            List<string> items=new List<string>();
-            string INBOX = "content://sms/inbox";
-            string[] reqCols = new string[] { "_id", "thread_id", "address", "person", "date", "body", "type" };
-            Android.Net.Uri uri = Android.Net.Uri.Parse(INBOX);
-            Android.Database.ICursor cursor = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity.ContentResolver.Query(uri, reqCols, null, null, null);
-
-            if (cursor.MoveToFirst())
+            if (cursor?.MoveToFirst() == true)
             {
                 do
                 {
-                    string messageId = cursor.GetString(cursor.GetColumnIndex(reqCols[0]));
-                    string threadId = cursor.GetString(cursor.GetColumnIndex(reqCols[1]));
-                    string address = cursor.GetString(cursor.GetColumnIndex(reqCols[2]));
-                    string name = cursor.GetString(cursor.GetColumnIndex(reqCols[3]));
-                    string date = cursor.GetString(cursor.GetColumnIndex(reqCols[4]));
-                    string msg = cursor.GetString(cursor.GetColumnIndex(reqCols[5]));
-                    string type = cursor.GetString(cursor.GetColumnIndex(reqCols[6]));
+                    var messageId = cursor.GetString(cursor.GetColumnIndex(reqCols[0]));
+                    var threadId = cursor.GetString(cursor.GetColumnIndex(reqCols[1]));
+                    var address = cursor.GetString(cursor.GetColumnIndex(reqCols[2]));
+                    var name = cursor.GetString(cursor.GetColumnIndex(reqCols[3]));
+                    var date = cursor.GetString(cursor.GetColumnIndex(reqCols[4]));
+                    var msg = cursor.GetString(cursor.GetColumnIndex(reqCols[5]));
+                    var type = cursor.GetString(cursor.GetColumnIndex(reqCols[6]));
 
                     items.Add(messageId + (","
                                            + (threadId + (","
@@ -40,33 +39,32 @@ public partial class MainPage : ContentPage
                                                                         + (name + (","
                                                                             + (date + (" ,"
                                                                                 + (msg + (" ," + type))))))))))));
-
                 } while (cursor.MoveToNext());
-
             }
 #endif
         }
+        
+        return items;
     }
-    
-    public async Task<PermissionStatus> CheckAndRequestSMSPermission()
+
+    private async Task<PermissionStatus> CheckAndRequestSmsPermission()
     {
         PermissionStatus status = await Permissions.CheckStatusAsync<Permissions.Sms>();
 
         if (status == PermissionStatus.Granted)
             return status;
 
-        if (status == PermissionStatus.Denied && DeviceInfo.Platform == DevicePlatform.iOS)
-        {
-            // Prompt the user to turn on in settings
-            // On iOS once a permission has been denied it may not be requested again from the application
-            return status;
-        }
-
-        if (Permissions.ShouldShowRationale<Permissions.Sms>())
-        {
-            // Prompt the user with additional information as to why the permission is needed
-        }
         status = await Permissions.RequestAsync<Permissions.Sms>();
         return status;
+    }
+
+    private void PhoneNumber_OnTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        Preferences.Set("recipient", PhoneNumber.Text);
+    }
+
+    private async void CallButton_OnClicked(object? sender, EventArgs e)
+    {
+        Messages.ItemsSource = await GetMessages();
     }
 }

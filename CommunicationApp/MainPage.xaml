@@ -9,7 +9,8 @@
             Padding="30,0"
             Spacing="25">
 
-            <Editor x:Name="PhoneNumber" Placeholder="From: +380987654321" TextChanged="PhoneNumber_OnTextChanged"></Editor>
+			<Entry x:Name="Backend" Placeholder="https://localhost:7001" TextChanged="Backend_OnTextChanged"></Entry>
+            <Entry x:Name="PhoneNumber" Placeholder="From: +380987654321" TextChanged="PhoneNumber_OnTextChanged"></Entry>
             <Button Text="Get messages" Clicked="CallButton_OnClicked" />
             <CollectionView x:Name="Messages" EmptyView="No messages yet">
                 <CollectionView.ItemTemplate>

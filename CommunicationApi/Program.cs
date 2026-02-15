@@ -23,7 +23,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapGet("/receive",
-    async (CommunicationApiDbContext dbContext, [FromBody] Message message) =>
+    async (CommunicationApiDbContext dbContext) =>
     {
         var messages = await dbContext.Messages
             .AsTracking()

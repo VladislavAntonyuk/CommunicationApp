@@ -10,6 +10,17 @@
 
 1. Somebody sends message on specific platform.
 
-2. Platform generates the webhook and sends POST request /receive/target_type. Example: /receive/teams. The message body is parsed from Teams. Retrieve the message body and sender.
+2. Platform generates the webhook and sends POST request /notify/target_type. Example: /notify/Email. The message body is parsed from WebHook. Retrieve the message body and sender.
 
-3. Send SMS back to my iPhone with text: TEAMS|SENDER|MESSAGE_BODY
+3. Store the webhook message body and sender in the database.
+
+## How to notify me (Send SMS back to iPhone)
+
+1. Android app periodically pings the web api sending GET /receive request.
+
+1. For each message send SMS back to my iPhone with text.
+
+## Demo
+
+![Demo](demo.mp4)
+

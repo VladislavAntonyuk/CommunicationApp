@@ -3,5 +3,6 @@
 public enum Target
 {
     Email,
-    Telegram
+    Telegram,
+    Teams
 }

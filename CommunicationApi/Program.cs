@@ -15,6 +15,7 @@ builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Emai
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseInMemoryDatabase("CommunicationApiDb"));
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<TelegramService>();
+builder.Services.AddScoped<TeamsService>();
 builder.Services.AddHostedService<TelegramBackgroundService>();
 builder.Services.AddSingleton<Client>(sp =>
 {
@@ -94,6 +95,10 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, Shared.Message mes
         case Target.Telegram:
             var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
             await telegramService.Send(parts[1], parts[2]);
+            return Results.Ok();
+        case Target.Teams:
+            var teamsService = scope.ServiceProvider.GetRequiredService<TeamsService>();
+            await teamsService.Send(parts[1], parts[2]);
             return Results.Ok();
         default:
             throw new ArgumentOutOfRangeException();

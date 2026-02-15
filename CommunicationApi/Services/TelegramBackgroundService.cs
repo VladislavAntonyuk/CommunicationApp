@@ -20,11 +20,11 @@ public class TelegramBackgroundService(IServiceProvider serviceProvider):Backgro
         {
             foreach (var u in updates.UpdateList)
             {
-                if (u is UpdateNewMessage { message: TL.Message mb } && mb.From.ID != telegramClient.UserId)
+                if (u is UpdateNewMessage { message: TL.Message mb } && mb.peer_id.ID != telegramClient.UserId)
                 {
                     using var http = new HttpClient();
 
-                    var payload = new Shared.Message($"Telegram|{mb.Peer.ID}|{mb.message}");
+                    var payload = new Shared.Message($"Telegram|{mb.peer_id.ID}|{mb.message}");
 
                     await http.PostAsJsonAsync($"{addresses.FirstOrDefault()}/notify/{Target.Telegram}", payload, cancellationToken: stoppingToken);
                 }

@@ -15,7 +15,7 @@ public class TeamsService(IConfiguration configuration)
         {
             AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
             ClientId = clientId,
-            TenantId = "consumers", // or 'common' if personal + work
+            TenantId = "common",
             DeviceCodeCallback = (code, token) =>
             {
                 Console.WriteLine(code.Message);

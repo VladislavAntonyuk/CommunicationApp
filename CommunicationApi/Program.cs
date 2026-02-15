@@ -1,6 +1,5 @@
 using CommunicationApi.Database;
 using CommunicationApi.Services;
-using MailerSendNetCore.Common.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Shared;
@@ -10,7 +9,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
-builder.Services.AddMailerSendEmailClient(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseInMemoryDatabase("CommunicationApiDb"));
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<TelegramService>();

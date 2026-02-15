@@ -1,29 +1,32 @@
-﻿using MailerSendNetCore.Common.Interfaces;
-using MailerSendNetCore.Emails.Dtos;
+﻿using Mailjet.Client;
+using Mailjet.Client.TransactionalEmails;
 using Microsoft.Extensions.Options;
 
 namespace CommunicationApi.Services;
 
-internal class EmailService(IMailerSendEmailClient client, IOptions<EmailSettings> options)
+internal class EmailService(IOptions<EmailSettings> options)
 {
-    public async Task Send(string recipient, string subject, string text)
+    public async Task<string?> Send(string recipient, string subject, string text)
     {
-        var parameters = new MailerSendEmailParameters
-        {
-            Text = text
-        };
-        parameters
-            .WithSubject(subject)
-            .WithFrom(options.Value.FromEmail, options.Value.FromName)
-            .WithTo(recipient);
+        MailjetClient client = new MailjetClient(options.Value.ApiKey, options.Value.ApiSecret);
 
-        await client.SendEmailAsync(parameters);
+        var email = new TransactionalEmailBuilder()
+            .WithFrom(new SendContact(options.Value.FromEmail))
+            .WithSubject(subject)
+            .WithTextPart(text)
+            .WithTo(new SendContact(recipient))
+            .Build();
+
+        var response = await client.SendTransactionalEmailAsync(email);
+
+        return response.Messages.Length > 0 ? response.Messages[0].Status : "Email is not sent";
     }
 }
 
 
 public class EmailSettings
 {
+    public required string ApiKey { get; set; }
+    public required string ApiSecret { get; set; }
     public required string FromEmail { get; set; }
-    public required string FromName { get; set; }
 }

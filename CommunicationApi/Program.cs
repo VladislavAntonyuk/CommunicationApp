@@ -2,6 +2,10 @@ using CommunicationApi.Database;
 using CommunicationApi.Services;
 using Microsoft.EntityFrameworkCore;
 using Shared;
+using WTelegram;
+
+string? _password = null;
+string? _otp = null;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +16,40 @@ builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseInMemoryDatab
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<TelegramService>();
 builder.Services.AddHostedService<TelegramBackgroundService>();
+builder.Services.AddSingleton<Client>(sp =>
+{
+    var telegram = builder.Configuration.GetSection("Telegram").Get<TelegramSettings>();
+
+    string ConfigProvider(string what)
+    {
+        switch (what)
+        {
+            case "api_id":
+                return telegram.AppId;
+            case "api_hash":
+                return telegram.AppHash;
+            case "phone_number":
+                return telegram.Phone;
+            case "session_pathname":
+                return Path.Combine(AppContext.BaseDirectory, "telegram.session");
+            case "verification_code":
+                while (_otp == null)
+                    Thread.Sleep(1000);
+
+                return _otp;
+            case "password":
+                while (_password == null)
+                    Thread.Sleep(1000);
+
+                return _password;
+            default:
+                return null;
+        }
+    }
+
+    var client = new Client(ConfigProvider);
+    return client;
+});
 
 var app = builder.Build();
 
@@ -43,7 +81,7 @@ app.MapGet("/receive",
     }).WithDescription(
     "This endpoint returns messages to Android client for back SMS.");
 
-app.MapPost("/send", async (IServiceProvider serviceProvider, Message message) =>
+app.MapPost("/send", async (IServiceProvider serviceProvider, Shared.Message message) =>
 {
     var parts = message.Text.Split('|');
     var target = Enum.Parse<Target>(parts[0], true);
@@ -62,7 +100,7 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, Message message) =
     }
 }).WithDescription("Android client sends request to this endpoint.");
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Target target, Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Target target, Shared.Message request) =>
 {
     dbContext.Messages.Add(new CommunicationApiMessage
     {
@@ -76,14 +114,13 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Targ
 
 app.MapPost("/telegram/otp", (TelegramAuthModel code) =>
 {
-    TelegramBackgroundService._otp = code.Code;
+    _otp = code.Code;
 });
 
 app.MapPost("/telegram/password", (TelegramAuthModel code) =>
 {
-    TelegramBackgroundService._password = code.Code;
+    _password = code.Code;
 });
-
 
 using var scope = app.Services.CreateScope();
 await using var dbContext = scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>();

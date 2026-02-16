@@ -9,7 +9,7 @@ public class TeamsService(IConfiguration configuration)
     public async Task Send(string recipient, string text)
     {
         var clientId = configuration["Teams:ClientId"];
-        var scopes = new[] { "User.Read", "Chat.Read", "Chat.ReadWrite" };
+        var scopes = new[] { "User.Read", "Chat.Read", "Chat.ReadWrite", "ChatMessage.Send", "offline_access" };
 
         var options = new DeviceCodeCredentialOptions
         {

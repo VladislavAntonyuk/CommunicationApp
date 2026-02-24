@@ -2,7 +2,7 @@
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 
-namespace CommunicationApi.Services;
+namespace CommunicationApi.Services.Teams;
 
 public class TeamsService(IConfiguration configuration)
 {

@@ -7,11 +7,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Mailjet.Api" Version="3.0.1" />
+        <PackageReference Include="Mailjet.Api" Version="4.0.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.2" />
-        <PackageReference Include="Microsoft.Graph" Version="5.102.0" />
-        <PackageReference Include="Azure.Identity" Version="1.18.0-beta.2" />
+        <PackageReference Include="Microsoft.Graph" Version="5.103.0" />
+        <PackageReference Include="Azure.Identity" Version="1.18.0-beta.3" />
+        <PackageReference Include="SlackNet" Version="0.17.9" />
         <PackageReference Include="WTelegramClient" Version="4.4.1" />
     </ItemGroup>
 

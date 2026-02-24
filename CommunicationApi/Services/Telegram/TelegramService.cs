@@ -1,6 +1,6 @@
 ﻿using WTelegram;
 
-namespace CommunicationApi.Services;
+namespace CommunicationApi.Services.Telegram;
 
 internal class TelegramService(IServiceProvider serviceProvider)
 {

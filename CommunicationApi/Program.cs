@@ -1,5 +1,8 @@
 using CommunicationApi.Database;
-using CommunicationApi.Services;
+using CommunicationApi.Services.Email;
+using CommunicationApi.Services.Slack;
+using CommunicationApi.Services.Teams;
+using CommunicationApi.Services.Telegram;
 using Microsoft.EntityFrameworkCore;
 using Shared;
 using WTelegram;
@@ -11,12 +14,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 
+builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseInMemoryDatabase("CommunicationApiDb"));
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<TelegramService>();
+builder.Services.AddScoped<SlackService>();
 builder.Services.AddScoped<TeamsService>();
 builder.Services.AddHostedService<TelegramBackgroundService>();
+builder.Services.AddHostedService<SlackBackgroundService>();
 builder.Services.AddSingleton<Client>(sp =>
 {
     var telegram = builder.Configuration.GetSection("Telegram").Get<TelegramSettings>();
@@ -99,6 +105,10 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, Shared.Message mes
         case Target.Teams:
             var teamsService = scope.ServiceProvider.GetRequiredService<TeamsService>();
             await teamsService.Send(parts[1], parts[2]);
+            return Results.Ok();
+        case Target.Slack:
+            var slackService = scope.ServiceProvider.GetRequiredService<SlackService>();
+            await slackService.Send(parts[1], parts[2]);
             return Results.Ok();
         default:
             throw new ArgumentOutOfRangeException();

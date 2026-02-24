@@ -2,7 +2,7 @@
 using Mailjet.Client.TransactionalEmails;
 using Microsoft.Extensions.Options;
 
-namespace CommunicationApi.Services;
+namespace CommunicationApi.Services.Email;
 
 internal class EmailService(IOptions<EmailSettings> options)
 {
@@ -21,12 +21,4 @@ internal class EmailService(IOptions<EmailSettings> options)
 
         return response.Messages.Length > 0 ? response.Messages[0].Status : "Email is not sent";
     }
-}
-
-
-public class EmailSettings
-{
-    public required string ApiKey { get; set; }
-    public required string ApiSecret { get; set; }
-    public required string FromEmail { get; set; }
 }

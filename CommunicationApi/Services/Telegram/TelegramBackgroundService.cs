@@ -4,7 +4,7 @@ using Shared;
 using TL;
 using WTelegram;
 
-namespace CommunicationApi.Services;
+namespace CommunicationApi.Services.Telegram;
 
 public class TelegramBackgroundService(IServiceProvider serviceProvider):BackgroundService
 {

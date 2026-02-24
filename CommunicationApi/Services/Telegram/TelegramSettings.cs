@@ -1,4 +1,4 @@
-namespace CommunicationApi.Services;
+namespace CommunicationApi.Services.Telegram;
 
 public class TelegramSettings
 {

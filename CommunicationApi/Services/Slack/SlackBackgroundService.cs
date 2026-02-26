@@ -16,7 +16,6 @@ public class SlackBackgroundService(IServiceProvider serviceProvider, IOptions<S
         var feature = server.Features.Get<IServerAddressesFeature>();
         var addresses = feature.Addresses;
         var slackServices = new SlackServiceBuilder()
-            .UseApiToken(settings.Value.ApiToken)
             .UseAppLevelToken(settings.Value.AppLevelToken)
             .RegisterEventHandler(ctx => new SlackMessageReceivedEventHandler(ctx.ServiceProvider.GetApiClient(), addresses.FirstOrDefault()));
 

@@ -1,5 +1,9 @@
 # Communication App
 
+> For now it is the app for individual use. I want to have a possibility to send messages from my iPhone to Android and receive messages from different platforms on my iPhone, when it is offline.
+
+> To test the app, you can change the appsettings.json file and run it using `docker compose up` command.
+
 ## How to send message
 
 1. I send SMS from my iPhone to Android Phone.

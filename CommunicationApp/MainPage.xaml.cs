@@ -94,7 +94,9 @@ public partial class MainPage : ContentPage
     private void SendSms(string message)
     {
 #if ANDROID
-        Android.Telephony.SmsManager.Default.SendTextMessage(PhoneNumber.Text, null, message, null, null);
+        var smsManager = (Android.Telephony.SmsManager?)Platform.CurrentActivity?.GetSystemService(Java.Lang.Class.FromType(typeof(Android.Telephony.SmsManager)));
+
+        smsManager?.SendTextMessage(PhoneNumber.Text, null, message, null, null);
 #endif
     }
 

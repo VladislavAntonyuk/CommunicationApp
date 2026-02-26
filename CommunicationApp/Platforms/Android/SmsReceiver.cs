@@ -37,18 +37,18 @@ public class SmsReceiver : BroadcastReceiver
                     var result = await httpClient.PostAsJsonAsync($"{Preferences.Get("backend", "")}/send", new Shared.Message(body));
                     if (result.IsSuccessStatusCode)
                     {
-                        Toast.MakeText(context, "SMS sent to API successfully!", ToastLength.Short).Show();
+                        Toast.MakeText(context, "SMS sent to API successfully!", ToastLength.Short)?.Show();
                     }
                     else
                     {
-                        Toast.MakeText(context, "Failed to send SMS to API: " + result.ReasonPhrase, ToastLength.Long).Show();
+                        Toast.MakeText(context, "Failed to send SMS to API: " + result.ReasonPhrase, ToastLength.Long)?.Show();
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            Toast.MakeText(context, "Error receiving SMS: " + ex.Message, ToastLength.Long).Show();
+            Toast.MakeText(context, "Error receiving SMS: " + ex.Message, ToastLength.Long)?.Show();
         }
     }
 }

@@ -1,13 +1,17 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11513.90 insiders
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunicationApp", "CommunicationApp\CommunicationApp.csproj", "{54D4D2AA-0D8E-4C7E-8ED7-669082531F6C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunicationApi", "CommunicationApi\CommunicationApi.csproj", "{0C9F668C-422F-4ED0-9C27-2BAAAC253986}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Items", "Items", "{45BE0E33-7A28-4331-B7AD-B2A2CB3D3252}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{6C396DB4-54F7-4449-9FB1-C35B0F33FF84}"
 	ProjectSection(SolutionItems) = preProject
+		Dockerfile = Dockerfile
 		README.md = README.md
 	EndProjectSection
 EndProject
@@ -29,5 +33,11 @@ Global
 		{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E3D95B3E-AD51-4A5B-9D3A-0C31E118C32E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {479289E4-B6B8-4138-91A9-3A356A77E14C}
 	EndGlobalSection
 EndGlobal

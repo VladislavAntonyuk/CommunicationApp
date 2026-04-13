@@ -3,6 +3,8 @@
 > For now it is the app for individual use. I want to have a possibility to send messages from my iPhone to Android and receive messages from different platforms on my iPhone, when it is offline.
 
 > To test the app, you can change the appsettings.json file and run it using `docker compose up` command.
+>
+> API is deployed to https://communicationapp.onrender.com/
 
 ## How to send message
 
@@ -26,5 +28,10 @@
 
 ## Demo
 
-![Demo](demo.mp4)
+See [Demo video](demo.mp4)
 
+![](demo.mp4)
+
+<video width="320" height="240" controls>
+  <source src="demo.mp4" type="video/mp4">
+</video>

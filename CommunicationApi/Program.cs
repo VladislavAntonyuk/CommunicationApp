@@ -73,7 +73,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapGet("/", () => {
-    return "Created by DotNetChickUa."
+    return "Created by DotNetChickUa.";
 });
 
 app.MapGet("/receive",

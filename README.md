@@ -28,6 +28,8 @@
 
 ## Demo
 
+Android app: https://github.com/DotNetChickUa/CommunicationApp/releases/tag/0.0.1
+
 See [Demo video](demo.mp4)
 
 ![](demo.mp4)

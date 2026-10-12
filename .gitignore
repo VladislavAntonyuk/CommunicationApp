@@ -482,3 +482,8 @@ $RECYCLE.BIN/
 *.swp
 
 CommunicationApi/appsettings.Development.json
+
+# SQLite database
+*.db
+*.db-shm
+*.db-wal

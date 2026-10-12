@@ -21,7 +21,7 @@ builder.Services.Configure<HostOptions>(opts =>
 
 builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
-builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseInMemoryDatabase("CommunicationApiDb"));
+builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<ISlackService, SlackService>();
@@ -176,7 +176,10 @@ app.MapPost("/telegram/password", (TelegramAuthModel code) =>
 
 using var scope = app.Services.CreateScope();
 await using var dbContext = scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>();
-dbContext.Database.EnsureCreated();
+if (dbContext.Database.IsRelational())
+    dbContext.Database.Migrate();
+else
+    dbContext.Database.EnsureCreated();
 
 app.Run();
 

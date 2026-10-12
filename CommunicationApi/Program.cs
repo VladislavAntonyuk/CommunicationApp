@@ -97,30 +97,58 @@ app.MapGet("/receive",
     }).WithDescription(
     "This endpoint returns messages to Android client for back SMS.");
 
-app.MapPost("/send", async (IServiceProvider serviceProvider, Shared.Message message) =>
+app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> logger, Shared.Message message) =>
 {
-    var parts = message.Text.Split('|');
-    var target = Enum.Parse<Target>(parts[0], true);
+    if (string.IsNullOrWhiteSpace(message.Text))
+        return Results.Problem("Text is required", statusCode: StatusCodes.Status400BadRequest);
+
+    var targetName = message.Text.Split('|', 2)[0].Trim();
+    if (!Enum.GetNames<Target>().Contains(targetName, StringComparer.OrdinalIgnoreCase))
+        return Results.Problem($"Unknown target '{targetName}'", statusCode: StatusCodes.Status400BadRequest);
+
+    var target = Enum.Parse<Target>(targetName, true);
+    var fieldCount = target == Target.Email ? 4 : 3;
+    
+    var parts = message.Text.Split('|', fieldCount);
+    if (parts.Length < fieldCount)
+        return Results.Problem(
+            target == Target.Email ? "Expected Email|to|subject|text" : $"Expected {target}|recipient|text",
+            statusCode: StatusCodes.Status400BadRequest);
+
+    if (target == Target.Telegram && !long.TryParse(parts[1], out _))
+        return Results.Problem("Telegram recipient must be a numeric chat id", statusCode: StatusCodes.Status400BadRequest);
+
     using var scope = serviceProvider.CreateScope();
-    switch (target)
+    try
     {
-        case Target.Email:
-            var emailService = scope.ServiceProvider.GetRequiredService<EmailService>();
-            return Results.Ok(await emailService.Send(parts[1], parts[2], parts[3]));
-        case Target.Telegram:
-            var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
-            await telegramService.Send(parts[1], parts[2]);
-            return Results.Ok();
-        case Target.Teams:
-            var teamsService = scope.ServiceProvider.GetRequiredService<TeamsService>();
-            await teamsService.Send(parts[1], parts[2]);
-            return Results.Ok();
-        case Target.Slack:
-            var slackService = scope.ServiceProvider.GetRequiredService<SlackService>();
-            await slackService.Send(parts[1], parts[2]);
-            return Results.Ok();
-        default:
-            throw new ArgumentOutOfRangeException();
+        switch (target)
+        {
+            case Target.Email:
+                var emailService = scope.ServiceProvider.GetRequiredService<EmailService>();
+                var status = await emailService.Send(parts[1], parts[2], parts[3]);
+                return string.Equals(status, "success", StringComparison.OrdinalIgnoreCase)
+                    ? Results.Ok(status)
+                    : Results.Problem($"Email is not sent: {status}", statusCode: StatusCodes.Status502BadGateway);
+            case Target.Telegram:
+                var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
+                await telegramService.Send(parts[1], parts[2]);
+                return Results.Ok();
+            case Target.Teams:
+                var teamsService = scope.ServiceProvider.GetRequiredService<TeamsService>();
+                await teamsService.Send(parts[1], parts[2]);
+                return Results.Ok();
+            case Target.Slack:
+                var slackService = scope.ServiceProvider.GetRequiredService<SlackService>();
+                await slackService.Send(parts[1], parts[2]);
+                return Results.Ok();
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to send {Target} message", target);
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway);
     }
 }).WithDescription("Android client sends request to this endpoint.");
 

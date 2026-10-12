@@ -22,10 +22,10 @@ builder.Services.Configure<HostOptions>(opts =>
 builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseInMemoryDatabase("CommunicationApiDb"));
-builder.Services.AddScoped<EmailService>();
-builder.Services.AddScoped<TelegramService>();
-builder.Services.AddScoped<SlackService>();
-builder.Services.AddScoped<TeamsService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ITelegramService, TelegramService>();
+builder.Services.AddScoped<ISlackService, SlackService>();
+builder.Services.AddScoped<ITeamsService, TeamsService>();
 builder.Services.AddHostedService<TelegramBackgroundService>();
 builder.Services.AddHostedService<SlackBackgroundService>();
 builder.Services.AddSingleton<Client>(sp =>
@@ -124,21 +124,21 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> l
         switch (target)
         {
             case Target.Email:
-                var emailService = scope.ServiceProvider.GetRequiredService<EmailService>();
+                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 var status = await emailService.Send(parts[1], parts[2], parts[3]);
                 return string.Equals(status, "success", StringComparison.OrdinalIgnoreCase)
                     ? Results.Ok(status)
                     : Results.Problem($"Email is not sent: {status}", statusCode: StatusCodes.Status502BadGateway);
             case Target.Telegram:
-                var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
+                var telegramService = scope.ServiceProvider.GetRequiredService<ITelegramService>();
                 await telegramService.Send(parts[1], parts[2]);
                 return Results.Ok();
             case Target.Teams:
-                var teamsService = scope.ServiceProvider.GetRequiredService<TeamsService>();
+                var teamsService = scope.ServiceProvider.GetRequiredService<ITeamsService>();
                 await teamsService.Send(parts[1], parts[2]);
                 return Results.Ok();
             case Target.Slack:
-                var slackService = scope.ServiceProvider.GetRequiredService<SlackService>();
+                var slackService = scope.ServiceProvider.GetRequiredService<ISlackService>();
                 await slackService.Send(parts[1], parts[2]);
                 return Results.Ok();
             default:

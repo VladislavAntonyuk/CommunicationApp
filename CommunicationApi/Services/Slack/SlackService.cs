@@ -4,7 +4,7 @@ using SlackNet.WebApi;
 
 namespace CommunicationApi.Services.Slack;
 
-public class SlackService(IOptions<SlackSettings> settings)
+public class SlackService(IOptions<SlackSettings> settings) : ISlackService
 {
     public async Task Send(string recipient, string text)
     {

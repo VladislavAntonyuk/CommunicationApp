@@ -4,7 +4,7 @@ using Microsoft.Graph.Models;
 
 namespace CommunicationApi.Services.Teams;
 
-public class TeamsService(IConfiguration configuration)
+public class TeamsService(IConfiguration configuration) : ITeamsService
 {
     public async Task Send(string recipient, string text)
     {

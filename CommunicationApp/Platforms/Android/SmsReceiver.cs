@@ -23,7 +23,7 @@ public class SmsReceiver : BroadcastReceiver
             string body = string.Concat(messages.Select(m => m.MessageBody));
 
             var from = Preferences.Get("from", null);
-            if (IsSameNumber(sender, from))
+            if (Shared.PhoneNumberMatcher.IsSameNumber(sender, from))
             {
                 using var httpClient = new HttpClient();
                 var result = await httpClient.PostAsJsonAsync($"{Preferences.Get("backend", "")}/send", new Shared.Message(body));
@@ -42,22 +42,4 @@ public class SmsReceiver : BroadcastReceiver
             Toast.MakeText(context, "Error receiving SMS: " + ex.Message, ToastLength.Long)?.Show();
         }
     }
-
-    private static bool IsSameNumber(string? sender, string? from)
-    {
-        if (!string.IsNullOrEmpty(sender) && sender == from)
-            return true;
-
-        var a = Digits(sender);
-        var b = Digits(from);
-        if (a.Length == 0 || b.Length == 0)
-            return false;
-
-        // The same number may arrive with or without a country code.
-        var (longer, shorter) = a.Length >= b.Length ? (a, b) : (b, a);
-        return longer == shorter || (shorter.Length >= 9 && longer.EndsWith(shorter));
-    }
-
-    private static string Digits(string? number) =>
-        new string((number ?? "").Where(char.IsDigit).ToArray()).TrimStart('0');
 }

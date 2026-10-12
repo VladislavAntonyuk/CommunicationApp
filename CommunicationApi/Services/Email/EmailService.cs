@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace CommunicationApi.Services.Email;
 
-internal class EmailService(IOptions<EmailSettings> options)
+internal class EmailService(IOptions<EmailSettings> options) : IEmailService
 {
     public async Task<string?> Send(string recipient, string subject, string text)
     {

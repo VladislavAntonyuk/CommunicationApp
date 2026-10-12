@@ -3,7 +3,7 @@ using WTelegram;
 
 namespace CommunicationApi.Services.Telegram;
 
-internal class TelegramService(IServiceProvider serviceProvider)
+internal class TelegramService(IServiceProvider serviceProvider) : ITelegramService
 {
     public async Task Send(string recipient, string text)
     {

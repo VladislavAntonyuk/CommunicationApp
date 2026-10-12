@@ -69,20 +69,59 @@ public partial class MainPage : ContentPage
 
     private async void CallButton_OnClicked(object? sender, EventArgs e)
     {
-        Messages.ItemsSource = await GetMessages();
-        var messages = await ReceiveMessages();
-#if ANDROID
-        if (AndroidX.Core.Content.ContextCompat.CheckSelfPermission(Platform.CurrentActivity, Android.Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
+        var sent = 0;
+        try
         {
-            AndroidX.Core.App.ActivityCompat.RequestPermissions(Platform.CurrentActivity, new string[] { Android.Manifest.Permission.SendSms }, 1);
-        }
-#endif
-        foreach (var item in messages)
-        {
-            SendSms(item.Text);
-        }
+            if (!Uri.TryCreate(Backend.Text, UriKind.Absolute, out var backend) || (backend.Scheme != Uri.UriSchemeHttp && backend.Scheme != Uri.UriSchemeHttps))
+            {
+                await Notify("Enter a valid backend URL");
+                return;
+            }
 
-        await Toast.Make($"{messages.Count} messages sent").Show();
+            if (string.IsNullOrWhiteSpace(PhoneNumber.Text))
+            {
+                await Notify("Enter a phone number");
+                return;
+            }
+
+            if (await CheckAndRequestSmsPermission() != PermissionStatus.Granted)
+            {
+                await Notify("SMS permission is required");
+                return;
+            }
+
+#if ANDROID
+            if (AndroidX.Core.Content.ContextCompat.CheckSelfPermission(Platform.CurrentActivity, Android.Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
+            {
+                AndroidX.Core.App.ActivityCompat.RequestPermissions(Platform.CurrentActivity, new string[] { Android.Manifest.Permission.SendSms }, 1);
+                await Notify("Allow sending SMS and try again");
+                return;
+            }
+#endif
+
+            Messages.ItemsSource = await GetMessages();
+            var messages = await ReceiveMessages();
+            foreach (var item in messages)
+            {
+                SendSms(item.Text);
+                sent++;
+            }
+
+            await Notify($"{messages.Count} messages sent");
+        }
+        catch (Exception ex)
+        {
+            await Notify($"Error after {sent} messages sent: {ex.Message}");
+        }
+    }
+
+    private async Task Notify(string text)
+    {
+#if ANDROID
+        await Toast.Make(text).Show();
+#else
+        await DisplayAlertAsync("CommunicationApp", text, "OK");
+#endif
     }
 
     private async Task<List<Message>> ReceiveMessages()

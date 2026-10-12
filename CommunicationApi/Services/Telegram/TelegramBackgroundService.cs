@@ -20,7 +20,7 @@ public class TelegramBackgroundService(IServiceProvider serviceProvider):Backgro
         {
             foreach (var u in updates.UpdateList)
             {
-                if (u is UpdateNewMessage { message: TL.Message mb } && mb.peer_id.ID != telegramClient.UserId)
+                if (u is UpdateNewMessage { message: TL.Message mb } && !mb.flags.HasFlag(TL.Message.Flags.out_))
                 {
                     using var http = new HttpClient();
 

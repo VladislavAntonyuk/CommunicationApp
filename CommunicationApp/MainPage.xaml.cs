@@ -135,7 +135,14 @@ public partial class MainPage : ContentPage
 #if ANDROID
         var smsManager = (Android.Telephony.SmsManager?)Platform.CurrentActivity?.GetSystemService(Java.Lang.Class.FromType(typeof(Android.Telephony.SmsManager)));
 
-        smsManager?.SendTextMessage(PhoneNumber.Text, null, message, null, null);
+        if (smsManager == null)
+            return;
+
+        var parts = smsManager.DivideMessage(message);
+        if (parts == null || parts.Count <= 1)
+            smsManager.SendTextMessage(PhoneNumber.Text, null, message, null, null);
+        else
+            smsManager.SendMultipartTextMessage(PhoneNumber.Text, null, parts, null, null);
 #endif
     }
 

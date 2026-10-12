@@ -27,19 +27,6 @@ public class TeamsService(IConfiguration configuration)
 
         var graphClient = new GraphServiceClient(deviceCodeCredential, scopes);
 
-        var chats = await graphClient.Chats.GetAsync();
-
-        foreach (var chat in chats.Value)
-        {
-            Console.WriteLine($"Chat: {chat.Topic}");
-
-            var messages = await graphClient.Chats[chat.Id].Messages.GetAsync();
-            foreach (var msg in messages.Value)
-            {
-                Console.WriteLine($"{msg.From?.User?.DisplayName}: {msg.Body?.Content}");
-            }
-        }
-
         await graphClient.Chats[recipient].Messages.PostAsync(new ChatMessage
         {
             Body = new ItemBody

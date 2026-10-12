@@ -1,9 +1,7 @@
 ﻿using System.Net.Http.Json;
 using Android.App;
 using Android.Content;
-using Android.OS;
 using Android.Widget;
-using Object = Java.Lang.Object;
 
 namespace CommunicationApp;
 
@@ -18,31 +16,24 @@ public class SmsReceiver : BroadcastReceiver
             if (intent?.Action != "android.provider.Telephony.SMS_RECEIVED")
                 return;
 
-            Bundle? bundle = intent.Extras;
-            if (bundle == null) return;
+            Android.Telephony.SmsMessage[]? messages = Android.Provider.Telephony.Sms.Intents.GetMessagesFromIntent(intent);
+            if (messages == null || messages.Length == 0) return;
 
-            var pdus = (Object[]?)bundle.Get("pdus");
-            if (pdus == null) return;
+            string? sender = messages[0].OriginatingAddress;
+            string body = string.Concat(messages.Select(m => m.MessageBody));
 
-            foreach (var pdu in pdus)
+            var from = Preferences.Get("from", null);
+            if (sender == from)
             {
-                Android.Telephony.SmsMessage? message = Android.Telephony.SmsMessage.CreateFromPdu((byte[])pdu, bundle.GetString("format"));
-                string? sender = message?.OriginatingAddress;
-                string? body = message?.MessageBody;
-
-                var from = Preferences.Get("from", null);
-                if (sender == from)
+                using var httpClient = new HttpClient();
+                var result = await httpClient.PostAsJsonAsync($"{Preferences.Get("backend", "")}/send", new Shared.Message(body));
+                if (result.IsSuccessStatusCode)
                 {
-                    using var httpClient = new HttpClient();
-                    var result = await httpClient.PostAsJsonAsync($"{Preferences.Get("backend", "")}/send", new Shared.Message(body));
-                    if (result.IsSuccessStatusCode)
-                    {
-                        Toast.MakeText(context, "SMS sent to API successfully!", ToastLength.Short)?.Show();
-                    }
-                    else
-                    {
-                        Toast.MakeText(context, "Failed to send SMS to API: " + result.ReasonPhrase, ToastLength.Long)?.Show();
-                    }
+                    Toast.MakeText(context, "SMS sent to API successfully!", ToastLength.Short)?.Show();
+                }
+                else
+                {
+                    Toast.MakeText(context, "Failed to send SMS to API: " + result.ReasonPhrase, ToastLength.Long)?.Show();
                 }
             }
         }

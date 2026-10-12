@@ -80,9 +80,20 @@ app.MapGet("/receive",
     async (CommunicationApiDbContext dbContext) =>
     {
         var messages = await dbContext.Messages
-            .AsTracking()
             .Where(x => !x.IsRead)
             .OrderBy(x => x.DateTime)
+            .ToListAsync();
+
+        return messages.Select(x => new ReceivedMessage(x.Id, x.Text));
+    }).WithDescription(
+    "This endpoint returns messages to Android client for back SMS. Messages are returned until they are acknowledged.");
+
+app.MapPost("/receive/ack",
+    async (CommunicationApiDbContext dbContext, Acknowledgement request) =>
+    {
+        var messages = await dbContext.Messages
+            .AsTracking()
+            .Where(x => !x.IsRead && request.Ids.Contains(x.Id))
             .ToListAsync();
         foreach (var item in messages)
         {
@@ -90,12 +101,8 @@ app.MapGet("/receive",
         }
 
         await dbContext.SaveChangesAsync();
-        return messages.Select(x => new
-        {
-            x.Text
-        });
     }).WithDescription(
-    "This endpoint returns messages to Android client for back SMS.");
+    "Android client confirms the messages it has sent as SMS, so they are not returned again.");
 
 app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> logger, Shared.Message message) =>
 {

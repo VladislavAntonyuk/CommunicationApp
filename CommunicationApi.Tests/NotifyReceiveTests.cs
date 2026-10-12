@@ -36,17 +36,52 @@ public sealed class NotifyReceiveTests : IDisposable
     }
 
     [Fact]
-    public async Task Receive_ReturnsEachMessageOnlyOnce()
+    public async Task Receive_NotAcknowledged_ReturnsMessagesAgain()
     {
         var client = _factory.CreateClient();
         await Notify(client, "Slack", "Slack|U1|first");
         await Receive(client);
+
+        var messages = await Receive(client);
+
+        Assert.Equal(new[] { "Slack|U1|first" }, messages.Select(x => x.Text).ToArray());
+    }
+
+    [Fact]
+    public async Task Acknowledge_MessagesAreNotReturnedAgain()
+    {
+        var client = _factory.CreateClient();
+        await Notify(client, "Slack", "Slack|U1|first");
+        await Acknowledge(client, (await Receive(client)).Select(x => x.Id));
         await Notify(client, "Slack", "Slack|U1|second");
 
         var messages = await Receive(client);
 
         Assert.Equal(new[] { "Slack|U1|second" }, messages.Select(x => x.Text).ToArray());
-        Assert.Empty(await Receive(client));
+    }
+
+    [Fact]
+    public async Task Acknowledge_OnlyAcknowledgedMessagesAreRemoved()
+    {
+        var client = _factory.CreateClient();
+        await Notify(client, "Slack", "Slack|U1|first");
+        await Notify(client, "Slack", "Slack|U1|second");
+        var first = (await Receive(client))[0];
+
+        await Acknowledge(client, [first.Id]);
+
+        Assert.Equal(new[] { "Slack|U1|second" }, (await Receive(client)).Select(x => x.Text).ToArray());
+    }
+
+    [Fact]
+    public async Task Acknowledge_UnknownId_SucceedsAndChangesNothing()
+    {
+        var client = _factory.CreateClient();
+        await Notify(client, "Slack", "Slack|U1|first");
+
+        await Acknowledge(client, [12345]);
+
+        Assert.Single(await Receive(client));
     }
 
     [Fact]
@@ -66,8 +101,14 @@ public sealed class NotifyReceiveTests : IDisposable
         response.EnsureSuccessStatusCode();
     }
 
-    private static async Task<List<Message>> Receive(HttpClient client)
+    private static async Task<List<ReceivedMessage>> Receive(HttpClient client)
     {
-        return await client.GetFromJsonAsync<List<Message>>("/receive", TestContext.Current.CancellationToken) ?? [];
+        return await client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
+    }
+
+    private static async Task Acknowledge(HttpClient client, IEnumerable<int> ids)
+    {
+        var response = await client.PostAsJsonAsync("/receive/ack", new Acknowledgement(ids.ToList()), TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
     }
 }

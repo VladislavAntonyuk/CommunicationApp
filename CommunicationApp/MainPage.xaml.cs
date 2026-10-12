@@ -104,6 +104,7 @@ public partial class MainPage : ContentPage
             foreach (var item in messages)
             {
                 SendSms(item.Text);
+                await AcknowledgeMessage(item.Id);
                 sent++;
             }
 
@@ -124,10 +125,17 @@ public partial class MainPage : ContentPage
 #endif
     }
 
-    private async Task<List<Message>> ReceiveMessages()
+    private async Task<List<ReceivedMessage>> ReceiveMessages()
     {
         using var httpClient = new HttpClient();
-        return await httpClient.GetFromJsonAsync<List<Message>>($"{Preferences.Get("backend", "")}/receive") ?? [];
+        return await httpClient.GetFromJsonAsync<List<ReceivedMessage>>($"{Preferences.Get("backend", "")}/receive") ?? [];
+    }
+
+    private async Task AcknowledgeMessage(int id)
+    {
+        using var httpClient = new HttpClient();
+        var response = await httpClient.PostAsJsonAsync($"{Preferences.Get("backend", "")}/receive/ack", new Acknowledgement([id]));
+        response.EnsureSuccessStatusCode();
     }
 
     private void SendSms(string message)
@@ -136,7 +144,7 @@ public partial class MainPage : ContentPage
         var smsManager = (Android.Telephony.SmsManager?)Platform.CurrentActivity?.GetSystemService(Java.Lang.Class.FromType(typeof(Android.Telephony.SmsManager)));
 
         if (smsManager == null)
-            return;
+            throw new InvalidOperationException("SMS manager is not available");
 
         var parts = smsManager.DivideMessage(message);
         if (parts == null || parts.Count <= 1)

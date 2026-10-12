@@ -26,6 +26,8 @@
 
 1. For each message send SMS back to my iPhone with text.
 
+1. After each SMS the app confirms it with a POST request /receive/ack, so the message is not returned again. Messages that are not confirmed are returned on the next /receive.
+
 ## Demo
 
 Android app: https://github.com/DotNetChickUa/CommunicationApp/releases/tag/0.0.1

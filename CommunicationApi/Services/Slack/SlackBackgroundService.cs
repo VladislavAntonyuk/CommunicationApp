@@ -17,7 +17,7 @@ public class SlackBackgroundService(IServiceProvider serviceProvider, IOptions<S
         var addresses = feature.Addresses;
         var slackServices = new SlackServiceBuilder()
             .UseAppLevelToken(settings.Value.AppLevelToken)
-            .RegisterEventHandler(ctx => new SlackMessageReceivedEventHandler(ctx.ServiceProvider.GetApiClient(), addresses.FirstOrDefault()));
+            .RegisterEventHandler(ctx => new SlackMessageReceivedEventHandler(addresses.FirstOrDefault()));
 
         Console.WriteLine("Connecting...");
 
@@ -28,14 +28,17 @@ public class SlackBackgroundService(IServiceProvider serviceProvider, IOptions<S
     }
 }
 
-class SlackMessageReceivedEventHandler(ISlackApiClient slack, string? address) : IEventHandler<MessageEvent>
+class SlackMessageReceivedEventHandler(string? address) : IEventHandler<MessageEvent>
 {
     public async Task Handle(MessageEvent slackEvent)
     {
+        if (string.IsNullOrEmpty(slackEvent.User))
+            return;
+
         using var http = new HttpClient();
 
-        var payload = new Shared.Message($"Slack|{(await slack.Users.Info(slackEvent.User)).Id}|{slackEvent.Text}");
+        var payload = new Shared.Message($"Slack|{slackEvent.User}|{slackEvent.Text}");
 
-        await http.PostAsJsonAsync($"{address}/notify/{Target.Telegram}", payload);
+        await http.PostAsJsonAsync($"{address}/notify/{Target.Slack}", payload);
     }
 }

@@ -21,6 +21,11 @@
                         </DataTemplate>
                     </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>
+                <VerticalStackLayout x:Name="TelegramSection" Spacing="10" IsVisible="False">
+                    <Label Text="Telegram account" FontAttributes="Bold" />
+                    <Label x:Name="TelegramAccount" />
+                    <Button x:Name="TelegramButton" IsVisible="False" Clicked="TelegramButton_OnClicked" />
+                </VerticalStackLayout>
                 <Label x:Name="ChatsTitle" Text="Telegram chats" FontAttributes="Bold" IsVisible="False" />
                 <Label x:Name="ChatsStatus" IsVisible="False" />
             </VerticalStackLayout>

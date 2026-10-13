@@ -6,5 +6,6 @@ public partial class AppShell : Shell
     {
         InitializeComponent();
         Routing.RegisterRoute(nameof(ProvidersPage), typeof(ProvidersPage));
+        Routing.RegisterRoute(nameof(TelegramLoginPage), typeof(TelegramLoginPage));
     }
 }

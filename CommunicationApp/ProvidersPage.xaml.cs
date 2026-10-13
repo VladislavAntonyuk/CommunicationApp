@@ -6,6 +6,8 @@ namespace CommunicationApp;
 
 public partial class ProvidersPage : ContentPage
 {
+    private bool _telegramLoggedIn;
+
     public ProvidersPage()
     {
         InitializeComponent();
@@ -30,12 +32,92 @@ public partial class ProvidersPage : ContentPage
             ShowStatus(null);
 
             if (providers.Any(x => x is { Target: Target.Telegram, Configured: true }))
-                await LoadChats(httpClient, backend);
+                await LoadTelegram(httpClient, backend);
         }
         catch (Exception ex)
         {
             ShowStatus(ForwardingError.Describe(ex));
         }
+    }
+
+    private async Task LoadTelegram(HttpClient httpClient, string backend)
+    {
+        TelegramSection.IsVisible = true;
+        TelegramButton.IsVisible = false;
+        HideChats();
+        try
+        {
+            TelegramAccount.Text = "Loading...";
+            var response = await httpClient.GetAsync($"{backend}/telegram/login");
+            if (!response.IsSuccessStatusCode)
+            {
+                TelegramAccount.Text = await ServerError.Read(response);
+                return;
+            }
+
+            var status = await response.Content.ReadFromJsonAsync<TelegramLoginStatus>();
+            _telegramLoggedIn = status?.Step == TelegramLoginStep.LoggedIn;
+            TelegramAccount.Text = status?.Step switch
+            {
+                TelegramLoginStep.LoggedIn => $"Connected as {status.Account}",
+                TelegramLoginStep.Code or TelegramLoginStep.Password => "Login is not finished",
+                _ => "Not connected"
+            };
+            TelegramButton.Text = status?.Step switch
+            {
+                TelegramLoginStep.LoggedIn => "Log out",
+                TelegramLoginStep.Code or TelegramLoginStep.Password => "Continue login",
+                _ => "Log in"
+            };
+            TelegramButton.IsVisible = true;
+        }
+        catch (Exception ex)
+        {
+            TelegramAccount.Text = ForwardingError.Describe(ex);
+            return;
+        }
+
+        if (_telegramLoggedIn)
+            await LoadChats(httpClient, backend);
+    }
+
+    private async void TelegramButton_OnClicked(object? sender, EventArgs e)
+    {
+        if (!_telegramLoggedIn)
+        {
+            await Shell.Current.GoToAsync(nameof(TelegramLoginPage));
+            return;
+        }
+
+        if (!await DisplayAlertAsync("Telegram", "Log out of Telegram on the server?", "Log out", "Cancel"))
+            return;
+
+        var backend = Preferences.Get("backend", "");
+        TelegramButton.IsEnabled = false;
+        try
+        {
+            using var httpClient = new HttpClient();
+            var response = await httpClient.PostAsync($"{backend}/telegram/logout", null);
+            if (response.IsSuccessStatusCode)
+                await LoadTelegram(httpClient, backend);
+            else
+                TelegramAccount.Text = await ServerError.Read(response);
+        }
+        catch (Exception ex)
+        {
+            TelegramAccount.Text = ForwardingError.Describe(ex);
+        }
+        finally
+        {
+            TelegramButton.IsEnabled = true;
+        }
+    }
+
+    private void HideChats()
+    {
+        Chats.ItemsSource = null;
+        ChatsTitle.IsVisible = false;
+        ShowChatsStatus(null);
     }
 
     private async Task LoadChats(HttpClient httpClient, string backend)
@@ -47,8 +129,7 @@ public partial class ProvidersPage : ContentPage
             var response = await httpClient.GetAsync($"{backend}/providers/{Target.Telegram}/chats");
             if (!response.IsSuccessStatusCode)
             {
-                var problem = await response.Content.ReadFromJsonAsync<Problem>();
-                ShowChatsStatus(problem?.Detail ?? $"Server error ({(int)response.StatusCode})");
+                ShowChatsStatus(await ServerError.Read(response));
                 return;
             }
 
@@ -122,8 +203,6 @@ public partial class ProvidersPage : ContentPage
         ChatsStatus.Text = text;
         ChatsStatus.IsVisible = text != null;
     }
-
-    private sealed record Problem(string? Detail);
 }
 
 public class ProviderRow(ProviderStatus status)

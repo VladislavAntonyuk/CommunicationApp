@@ -32,8 +32,9 @@ public static class MessageForwarder
         }
         catch (Exception ex)
         {
-            ForwardingHistory.AddFailure(ex.Message);
-            throw new InvalidOperationException($"Error after {sent} messages sent: {ex.Message}", ex);
+            var reason = Describe(ex);
+            ForwardingHistory.AddFailure(reason);
+            throw new InvalidOperationException($"Error after {sent} messages sent: {reason}", ex);
         }
         finally
         {
@@ -41,19 +42,37 @@ public static class MessageForwarder
         }
     }
 
+    private static string Describe(Exception ex) => ex switch
+    {
+        SmsFailedException => ex.Message,
+        HttpRequestException { StatusCode: { } statusCode } => $"Server error ({(int)statusCode})",
+        HttpRequestException or System.Net.WebException => "Could not reach the server",
+        TaskCanceledException => "The server did not respond in time",
+        _ => ex.Message
+    };
+
     private static void SendSms(string phoneNumber, string message)
     {
 #if ANDROID
-        var smsManager = (Android.Telephony.SmsManager?)Android.App.Application.Context.GetSystemService(Java.Lang.Class.FromType(typeof(Android.Telephony.SmsManager)));
+        try
+        {
+            var smsManager = (Android.Telephony.SmsManager?)Android.App.Application.Context.GetSystemService(Java.Lang.Class.FromType(typeof(Android.Telephony.SmsManager)));
 
-        if (smsManager == null)
-            throw new InvalidOperationException("SMS manager is not available");
+            if (smsManager == null)
+                throw new InvalidOperationException("SMS manager is not available");
 
-        var parts = smsManager.DivideMessage(message);
-        if (parts == null || parts.Count <= 1)
-            smsManager.SendTextMessage(phoneNumber, null, message, null, null);
-        else
-            smsManager.SendMultipartTextMessage(phoneNumber, null, parts, null, null);
+            var parts = smsManager.DivideMessage(message);
+            if (parts == null || parts.Count <= 1)
+                smsManager.SendTextMessage(phoneNumber, null, message, null, null);
+            else
+                smsManager.SendMultipartTextMessage(phoneNumber, null, parts, null, null);
+        }
+        catch (Exception ex)
+        {
+            throw new SmsFailedException($"Could not send SMS: {ex.Message}", ex);
+        }
 #endif
     }
+
+    private sealed class SmsFailedException(string message, Exception inner) : Exception(message, inner);
 }

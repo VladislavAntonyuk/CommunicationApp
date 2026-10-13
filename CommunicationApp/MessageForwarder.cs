@@ -32,7 +32,7 @@ public static class MessageForwarder
         }
         catch (Exception ex)
         {
-            var reason = Describe(ex);
+            var reason = ForwardingError.Describe(ex);
             ForwardingHistory.AddFailure(reason);
             throw new InvalidOperationException($"Error after {sent} messages sent: {reason}", ex);
         }
@@ -41,15 +41,6 @@ public static class MessageForwarder
             Gate.Release();
         }
     }
-
-    private static string Describe(Exception ex) => ex switch
-    {
-        SmsFailedException => ex.Message,
-        HttpRequestException { StatusCode: { } statusCode } => $"Server error ({(int)statusCode})",
-        HttpRequestException or System.Net.WebException => "Could not reach the server",
-        TaskCanceledException => "The server did not respond in time",
-        _ => ex.Message
-    };
 
     private static void SendSms(string phoneNumber, string message)
     {

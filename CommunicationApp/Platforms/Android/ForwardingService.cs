@@ -13,7 +13,11 @@ public class ForwardingService : Service
     private const int NotificationId = 1;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
+    private const string IdleText = "Forwarding messages";
+
     private CancellationTokenSource? _cts;
+    private string _lastForwardedText = IdleText;
+    private string _shownText = IdleText;
 
     public static void Start()
     {
@@ -31,7 +35,8 @@ public class ForwardingService : Service
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
     {
-        ServiceCompat.StartForeground(this, NotificationId, BuildNotification(), (int)ForegroundService.TypeSpecialUse);
+        var type = OperatingSystem.IsAndroidVersionAtLeast(34) ? (int)ForegroundService.TypeSpecialUse : 0;
+        ServiceCompat.StartForeground(this, NotificationId, BuildNotification(_shownText), type);
 
         if (_cts == null)
         {
@@ -49,7 +54,7 @@ public class ForwardingService : Service
         base.OnDestroy();
     }
 
-    private static async Task Run(CancellationToken token)
+    private async Task Run(CancellationToken token)
     {
         using var timer = new PeriodicTimer(Interval);
         try
@@ -58,11 +63,16 @@ public class ForwardingService : Service
             {
                 try
                 {
-                    await MessageForwarder.ForwardPending();
+                    var sent = await MessageForwarder.ForwardPending();
+                    if (sent > 0)
+                        _lastForwardedText = $"Last forwarded: {sent} {(sent == 1 ? "message" : "messages")} at {DateTime.Now:HH:mm}";
+
+                    ShowText(_lastForwardedText, token);
                 }
                 catch (Exception ex)
                 {
                     Android.Util.Log.Warn(nameof(ForwardingService), ex.ToString());
+                    ShowText($"Last check failed at {DateTime.Now:HH:mm}", token);
                 }
             } while (await timer.WaitForNextTickAsync(token));
         }
@@ -71,7 +81,17 @@ public class ForwardingService : Service
         }
     }
 
-    private Notification BuildNotification()
+    private void ShowText(string text, CancellationToken token)
+    {
+        // Posting after the service was stopped would bring the notification back.
+        if (token.IsCancellationRequested || text == _shownText)
+            return;
+
+        _shownText = text;
+        ((NotificationManager?)GetSystemService(NotificationService))?.Notify(NotificationId, BuildNotification(text));
+    }
+
+    private Notification BuildNotification(string text)
     {
         if (OperatingSystem.IsAndroidVersionAtLeast(26))
         {
@@ -86,7 +106,8 @@ public class ForwardingService : Service
 
         return new NotificationCompat.Builder(this, ChannelId)
             .SetContentTitle("CommunicationApp")!
-            .SetContentText("Forwarding messages")!
+            .SetContentText(text)!
+            .SetOnlyAlertOnce(true)!
             .SetSmallIcon(Android.Resource.Drawable.StatNotifySync)!
             .SetContentIntent(openApp)!
             .SetOngoing(true)!

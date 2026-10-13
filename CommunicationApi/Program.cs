@@ -165,6 +165,13 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Targ
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;
 
+    if (request.ChatId != null)
+    {
+        var saved = await dbContext.ChatSettings.FirstOrDefaultAsync(x => x.Target == target && x.ChatId == request.ChatId);
+        if (!(saved?.Enabled ?? ChatDefaults.IsEnabled(request.ChatKind)))
+            return;
+    }
+
     dbContext.Messages.Add(new CommunicationApiMessage
     {
         Text = request.Text,
@@ -202,6 +209,45 @@ app.MapPut("/providers/{target}",
         await dbContext.SaveChangesAsync();
         return Results.Ok();
     }).WithDescription("Switches receiving from a provider on or off.");
+
+app.MapGet("/providers/{target}/chats",
+    async (CommunicationApiDbContext dbContext, ITelegramService telegramService, ILogger<Program> logger, Target target) =>
+    {
+        if (target != Target.Telegram)
+            return Results.Problem($"Chats cannot be chosen for {target}", statusCode: StatusCodes.Status400BadRequest);
+
+        try
+        {
+            var chats = await telegramService.GetChats();
+            var saved = await dbContext.ChatSettings
+                .Where(x => x.Target == target)
+                .ToDictionaryAsync(x => x.ChatId, x => x.Enabled);
+
+            return Results.Ok(chats.Select(x =>
+                new ChatStatus(x.Id, x.Title, x.Kind, saved.TryGetValue(x.Id, out var enabled) ? enabled : ChatDefaults.IsEnabled(x.Kind))));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get {Target} chats", target);
+            return Results.Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway);
+        }
+    }).WithDescription("Chats of a provider, and whether messages from each are received.");
+
+app.MapPut("/providers/{target}/chats/{chatId}",
+    async (CommunicationApiDbContext dbContext, Target target, string chatId, ProviderSwitch request) =>
+    {
+        if (target != Target.Telegram)
+            return Results.Problem($"Chats cannot be chosen for {target}", statusCode: StatusCodes.Status400BadRequest);
+
+        var setting = await dbContext.ChatSettings.AsTracking().FirstOrDefaultAsync(x => x.Target == target && x.ChatId == chatId);
+        if (setting == null)
+            dbContext.ChatSettings.Add(new ChatSetting { Target = target, ChatId = chatId, Enabled = request.Enabled });
+        else
+            setting.Enabled = request.Enabled;
+
+        await dbContext.SaveChangesAsync();
+        return Results.Ok();
+    }).WithDescription("Switches receiving from one chat on or off.");
 
 app.MapPost("/telegram/otp", (TelegramAuthModel code) =>
 {

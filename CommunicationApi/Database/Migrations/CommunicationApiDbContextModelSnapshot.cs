@@ -17,6 +17,22 @@ namespace CommunicationApi.Database.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("CommunicationApi.Database.ChatSetting", b =>
+                {
+                    b.Property<int>("Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ChatId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Target", "ChatId");
+
+                    b.ToTable("ChatSettings");
+                });
+
             modelBuilder.Entity("CommunicationApi.Database.CommunicationApiMessage", b =>
                 {
                     b.Property<int>("Id")

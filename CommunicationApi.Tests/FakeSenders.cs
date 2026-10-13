@@ -24,6 +24,16 @@ public sealed class FakeSenders : IEmailService, ITelegramService, ITeamsService
 
     Task ITelegramService.Send(string recipient, string text) => Record(new SentMessage(Target.Telegram, recipient, null, text));
 
+    public List<TelegramChat> TelegramChats { get; } = [];
+
+    Task<List<TelegramChat>> ITelegramService.GetChats()
+    {
+        if (Exception != null)
+            throw Exception;
+
+        return Task.FromResult(TelegramChats);
+    }
+
     Task ITeamsService.Send(string recipient, string text) => Record(new SentMessage(Target.Teams, recipient, null, text));
 
     Task ISlackService.Send(string recipient, string text) => Record(new SentMessage(Target.Slack, recipient, null, text));

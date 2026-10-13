@@ -78,6 +78,11 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private async void ProvidersButton_OnClicked(object? sender, EventArgs e)
+    {
+        await Shell.Current.GoToAsync(nameof(ProvidersPage));
+    }
+
     private async void AutoForward_OnToggled(object? sender, ToggledEventArgs e)
     {
         if (_loading)

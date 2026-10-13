@@ -15,7 +15,7 @@
                 <Switch x:Name="AutoForward" Toggled="AutoForward_OnToggled" />
                 <Label Text="Forward automatically" VerticalOptions="Center" />
             </HorizontalStackLayout>
-            <Button Text="Get messages" Clicked="CallButton_OnClicked" />
+            <Button Text="Forward now" Clicked="CallButton_OnClicked" />
             <CollectionView x:Name="Messages" EmptyView="No messages yet">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="{x:Type x:String}">

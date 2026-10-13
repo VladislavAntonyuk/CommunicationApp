@@ -1,4 +1,5 @@
 using CommunicationApi.Database;
+using CommunicationApi.Services;
 using CommunicationApi.Services.Email;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
@@ -161,6 +162,9 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> l
 
 app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Target target, Shared.Message request) =>
 {
+    if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
+        return;
+
     dbContext.Messages.Add(new CommunicationApiMessage
     {
         Text = request.Text,
@@ -170,6 +174,34 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Targ
     });
     await dbContext.SaveChangesAsync();
 }).WithDescription("Service sends webhooks on this endpoint.");
+
+app.MapGet("/providers",
+    async (CommunicationApiDbContext dbContext, IConfiguration configuration) =>
+    {
+        var disabled = await dbContext.ProviderSettings
+            .Where(x => !x.Enabled)
+            .Select(x => x.Target)
+            .ToListAsync();
+
+        return ReceivingProviders.All.Select(x =>
+            new ProviderStatus(x, !disabled.Contains(x), ReceivingProviders.IsConfigured(x, configuration)));
+    }).WithDescription("Providers that can receive messages, and whether receiving is switched on for each.");
+
+app.MapPut("/providers/{target}",
+    async (CommunicationApiDbContext dbContext, Target target, ProviderSwitch request) =>
+    {
+        if (!ReceivingProviders.All.Contains(target))
+            return Results.Problem($"{target} does not receive messages", statusCode: StatusCodes.Status400BadRequest);
+
+        var setting = await dbContext.ProviderSettings.AsTracking().FirstOrDefaultAsync(x => x.Target == target);
+        if (setting == null)
+            dbContext.ProviderSettings.Add(new ProviderSetting { Target = target, Enabled = request.Enabled });
+        else
+            setting.Enabled = request.Enabled;
+
+        await dbContext.SaveChangesAsync();
+        return Results.Ok();
+    }).WithDescription("Switches receiving from a provider on or off.");
 
 app.MapPost("/telegram/otp", (TelegramAuthModel code) =>
 {

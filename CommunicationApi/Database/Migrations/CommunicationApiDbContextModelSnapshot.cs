@@ -40,6 +40,19 @@ namespace CommunicationApi.Database.Migrations
 
                     b.ToTable("Messages");
                 });
+
+            modelBuilder.Entity("CommunicationApi.Database.ProviderSetting", b =>
+                {
+                    b.Property<int>("Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Target");
+
+                    b.ToTable("ProviderSettings");
+                });
 #pragma warning restore 612, 618
         }
     }

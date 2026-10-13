@@ -22,6 +22,7 @@ public static class MessageForwarder
             foreach (var item in messages)
             {
                 SendSms(phoneNumber, item.Text);
+                ForwardingHistory.AddForwarded(item.Text);
                 var response = await httpClient.PostAsJsonAsync($"{backend}/receive/ack", new Acknowledgement([item.Id]));
                 response.EnsureSuccessStatusCode();
                 sent++;
@@ -31,6 +32,7 @@ public static class MessageForwarder
         }
         catch (Exception ex)
         {
+            ForwardingHistory.AddFailure(ex.Message);
             throw new InvalidOperationException($"Error after {sent} messages sent: {ex.Message}", ex);
         }
         finally

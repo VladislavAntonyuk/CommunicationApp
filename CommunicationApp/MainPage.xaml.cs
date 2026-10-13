@@ -22,6 +22,29 @@ public partial class MainPage : ContentPage
 #endif
     }
 
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        ForwardingHistory.Changed += OnHistoryChanged;
+        ShowHistory();
+    }
+
+    protected override void OnDisappearing()
+    {
+        ForwardingHistory.Changed -= OnHistoryChanged;
+        base.OnDisappearing();
+    }
+
+    // Raised by the background service too, so it may arrive on a non-UI thread.
+    private void OnHistoryChanged() => MainThread.BeginInvokeOnMainThread(ShowHistory);
+
+    private void ShowHistory()
+    {
+        History.ItemsSource = ForwardingHistory.GetEntries()
+            .Select(x => $"{(x.Time.Date == DateTime.Today ? x.Time.ToString("HH:mm") : x.Time.ToString("dd MMM HH:mm"))}  {x.Source}  {x.Text}")
+            .ToList();
+    }
+
     private async Task<List<string>> GetMessages()
     {
         var res = await CheckAndRequestSmsPermission();

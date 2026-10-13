@@ -1,16 +1,25 @@
-﻿using System.Net.Http.Json;
-using CommunityToolkit.Maui.Alerts;
-using Shared;
+﻿using CommunityToolkit.Maui.Alerts;
 
 namespace CommunicationApp;
 
 public partial class MainPage : ContentPage
 {
+    private readonly bool _loading;
+
     public MainPage()
     {
         InitializeComponent();
         PhoneNumber.Text = Preferences.Get("from", "");
         Backend.Text = Preferences.Get("backend", "");
+
+        _loading = true;
+        AutoForward.IsToggled = Preferences.Get("autoForward", false);
+        _loading = false;
+#if ANDROID
+        // The service does not survive a reboot or a force stop, so start it again if it was left on.
+        if (AutoForward.IsToggled)
+            ForwardingService.Start();
+#endif
     }
 
     private async Task<List<string>> GetMessages()
@@ -69,51 +78,84 @@ public partial class MainPage : ContentPage
 
     private async void CallButton_OnClicked(object? sender, EventArgs e)
     {
-        var sent = 0;
         try
         {
-            if (!Uri.TryCreate(Backend.Text, UriKind.Absolute, out var backend) || (backend.Scheme != Uri.UriSchemeHttp && backend.Scheme != Uri.UriSchemeHttps))
-            {
-                await Notify("Enter a valid backend URL");
+            if (!await EnsureReadyToForward())
                 return;
-            }
-
-            if (string.IsNullOrWhiteSpace(PhoneNumber.Text))
-            {
-                await Notify("Enter a phone number");
-                return;
-            }
-
-            if (await CheckAndRequestSmsPermission() != PermissionStatus.Granted)
-            {
-                await Notify("SMS permission is required");
-                return;
-            }
-
-#if ANDROID
-            if (AndroidX.Core.Content.ContextCompat.CheckSelfPermission(Platform.CurrentActivity, Android.Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
-            {
-                AndroidX.Core.App.ActivityCompat.RequestPermissions(Platform.CurrentActivity, new string[] { Android.Manifest.Permission.SendSms }, 1);
-                await Notify("Allow sending SMS and try again");
-                return;
-            }
-#endif
 
             Messages.ItemsSource = await GetMessages();
-            var messages = await ReceiveMessages();
-            foreach (var item in messages)
-            {
-                SendSms(item.Text);
-                await AcknowledgeMessage(item.Id);
-                sent++;
-            }
+            var sent = await MessageForwarder.ForwardPending();
 
-            await Notify($"{messages.Count} messages sent");
+            await Notify($"{sent} messages sent");
         }
         catch (Exception ex)
         {
-            await Notify($"Error after {sent} messages sent: {ex.Message}");
+            await Notify(ex.Message);
         }
+    }
+
+    private async void AutoForward_OnToggled(object? sender, ToggledEventArgs e)
+    {
+        if (_loading)
+            return;
+
+        try
+        {
+            if (e.Value && !await EnsureReadyToForward())
+            {
+                AutoForward.IsToggled = false;
+                return;
+            }
+
+            Preferences.Set("autoForward", e.Value);
+#if ANDROID
+            if (e.Value)
+            {
+                await Permissions.RequestAsync<Permissions.PostNotifications>();
+                ForwardingService.Start();
+            }
+            else
+            {
+                ForwardingService.Stop();
+            }
+#endif
+        }
+        catch (Exception ex)
+        {
+            await Notify(ex.Message);
+        }
+    }
+
+    private async Task<bool> EnsureReadyToForward()
+    {
+        if (!Uri.TryCreate(Backend.Text, UriKind.Absolute, out var backend) || (backend.Scheme != Uri.UriSchemeHttp && backend.Scheme != Uri.UriSchemeHttps))
+        {
+            await Notify("Enter a valid backend URL");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(PhoneNumber.Text))
+        {
+            await Notify("Enter a phone number");
+            return false;
+        }
+
+        if (await CheckAndRequestSmsPermission() != PermissionStatus.Granted)
+        {
+            await Notify("SMS permission is required");
+            return false;
+        }
+
+#if ANDROID
+        if (AndroidX.Core.Content.ContextCompat.CheckSelfPermission(Platform.CurrentActivity, Android.Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
+        {
+            AndroidX.Core.App.ActivityCompat.RequestPermissions(Platform.CurrentActivity, new string[] { Android.Manifest.Permission.SendSms }, 1);
+            await Notify("Allow sending SMS and try again");
+            return false;
+        }
+#endif
+
+        return true;
     }
 
     private async Task Notify(string text)
@@ -122,35 +164,6 @@ public partial class MainPage : ContentPage
         await Toast.Make(text).Show();
 #else
         await DisplayAlertAsync("CommunicationApp", text, "OK");
-#endif
-    }
-
-    private async Task<List<ReceivedMessage>> ReceiveMessages()
-    {
-        using var httpClient = new HttpClient();
-        return await httpClient.GetFromJsonAsync<List<ReceivedMessage>>($"{Preferences.Get("backend", "")}/receive") ?? [];
-    }
-
-    private async Task AcknowledgeMessage(int id)
-    {
-        using var httpClient = new HttpClient();
-        var response = await httpClient.PostAsJsonAsync($"{Preferences.Get("backend", "")}/receive/ack", new Acknowledgement([id]));
-        response.EnsureSuccessStatusCode();
-    }
-
-    private void SendSms(string message)
-    {
-#if ANDROID
-        var smsManager = (Android.Telephony.SmsManager?)Platform.CurrentActivity?.GetSystemService(Java.Lang.Class.FromType(typeof(Android.Telephony.SmsManager)));
-
-        if (smsManager == null)
-            throw new InvalidOperationException("SMS manager is not available");
-
-        var parts = smsManager.DivideMessage(message);
-        if (parts == null || parts.Count <= 1)
-            smsManager.SendTextMessage(PhoneNumber.Text, null, message, null, null);
-        else
-            smsManager.SendMultipartTextMessage(PhoneNumber.Text, null, parts, null, null);
 #endif
     }
 

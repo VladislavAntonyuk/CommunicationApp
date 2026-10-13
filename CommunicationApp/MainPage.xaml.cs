@@ -45,44 +45,6 @@ public partial class MainPage : ContentPage
             .ToList();
     }
 
-    private async Task<List<string>> GetMessages()
-    {
-        var res = await CheckAndRequestSmsPermission();
-        List<string> items = [];
-        if (res.Equals(PermissionStatus.Granted))
-        {
-#if ANDROID
-            string inbox = "content://sms/inbox";
-            string[] reqCols = ["_id", "thread_id", "address", "person", "date", "body", "type"];
-            var uri = Android.Net.Uri.Parse(inbox);
-            var cursor = Platform.CurrentActivity?.ContentResolver?.Query(uri, reqCols, null, null, null);
-
-            if (cursor?.MoveToFirst() == true)
-            {
-                do
-                {
-                    var messageId = cursor.GetString(cursor.GetColumnIndex(reqCols[0]));
-                    var threadId = cursor.GetString(cursor.GetColumnIndex(reqCols[1]));
-                    var address = cursor.GetString(cursor.GetColumnIndex(reqCols[2]));
-                    var name = cursor.GetString(cursor.GetColumnIndex(reqCols[3]));
-                    var date = cursor.GetString(cursor.GetColumnIndex(reqCols[4]));
-                    var msg = cursor.GetString(cursor.GetColumnIndex(reqCols[5]));
-                    var type = cursor.GetString(cursor.GetColumnIndex(reqCols[6]));
-
-                    items.Add(messageId + (","
-                                           + (threadId + (","
-                                                          + (address + (","
-                                                                        + (name + (","
-                                                                            + (date + (" ,"
-                                                                                + (msg + (" ," + type))))))))))));
-                } while (cursor.MoveToNext());
-            }
-#endif
-        }
-
-        return items;
-    }
-
     private async Task<PermissionStatus> CheckAndRequestSmsPermission()
     {
         PermissionStatus status = await Permissions.CheckStatusAsync<Permissions.Sms>();
@@ -106,7 +68,6 @@ public partial class MainPage : ContentPage
             if (!await EnsureReadyToForward())
                 return;
 
-            Messages.ItemsSource = await GetMessages();
             var sent = await MessageForwarder.ForwardPending();
 
             await Notify($"{sent} messages sent");

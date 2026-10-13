@@ -21,6 +21,8 @@ public class ApiFactory : WebApplicationFactory<Program>
 
     public FakeSenders Senders { get; } = new();
 
+    public FakeTelegramLogin TelegramLogin { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _connection.Open();
@@ -45,6 +47,7 @@ public class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<ITelegramService>(Senders);
             services.AddSingleton<ITeamsService>(Senders);
             services.AddSingleton<ISlackService>(Senders);
+            services.AddSingleton<ITelegramLogin>(TelegramLogin);
         });
     }
 

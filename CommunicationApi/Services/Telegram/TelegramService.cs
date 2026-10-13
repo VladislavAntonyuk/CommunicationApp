@@ -1,15 +1,13 @@
-﻿using Shared;
+using Shared;
 using TL;
-using WTelegram;
 
 namespace CommunicationApi.Services.Telegram;
 
-internal class TelegramService(IServiceProvider serviceProvider) : ITelegramService
+internal class TelegramService(TelegramLogin login) : ITelegramService
 {
     public async Task Send(string recipient, string text)
     {
-        var client = serviceProvider.GetRequiredService<Client>();
-        await client.LoginUserIfNeeded();
+        var client = await login.GetLoggedInClient();
         var id = long.Parse(recipient);
         var dialogs = await client.Messages_GetAllDialogs();
         InputPeer peer = dialogs.users.TryGetValue(id, out var user) ? user
@@ -20,11 +18,7 @@ internal class TelegramService(IServiceProvider serviceProvider) : ITelegramServ
 
     public async Task<List<TelegramChat>> GetChats()
     {
-        var client = serviceProvider.GetRequiredService<Client>();
-        // LoginUserIfNeeded would wait for a login code here, and the request would never finish.
-        if (client.User == null)
-            throw new InvalidOperationException("Telegram is not logged in");
-
+        var client = await login.GetLoggedInClient();
         var dialogs = await client.Messages_GetAllDialogs();
         var chats = new List<TelegramChat>();
         foreach (var dialog in dialogs.dialogs)

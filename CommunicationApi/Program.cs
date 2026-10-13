@@ -6,10 +6,6 @@ using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
 using Microsoft.EntityFrameworkCore;
 using Shared;
-using WTelegram;
-
-string? _password = null;
-string? _otp = null;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,40 +25,8 @@ builder.Services.AddScoped<ISlackService, SlackService>();
 builder.Services.AddScoped<ITeamsService, TeamsService>();
 builder.Services.AddHostedService<TelegramBackgroundService>();
 builder.Services.AddHostedService<SlackBackgroundService>();
-builder.Services.AddSingleton<Client>(sp =>
-{
-    var telegram = builder.Configuration.GetSection("Telegram").Get<TelegramSettings>();
-
-    string ConfigProvider(string what)
-    {
-        switch (what)
-        {
-            case "api_id":
-                return telegram.AppId;
-            case "api_hash":
-                return telegram.AppHash;
-            case "phone_number":
-                return telegram.Phone;
-            case "session_pathname":
-                return Path.Combine(AppContext.BaseDirectory, "telegram.session");
-            case "verification_code":
-                while (_otp == null)
-                    Thread.Sleep(1000);
-
-                return _otp;
-            case "password":
-                while (_password == null)
-                    Thread.Sleep(1000);
-
-                return _password;
-            default:
-                return null;
-        }
-    }
-
-    var client = new Client(ConfigProvider);
-    return client;
-});
+builder.Services.AddSingleton<TelegramLogin>();
+builder.Services.AddSingleton<ITelegramLogin>(sp => sp.GetRequiredService<TelegramLogin>());
 
 var app = builder.Build();
 
@@ -249,15 +213,17 @@ app.MapPut("/providers/{target}/chats/{chatId}",
         return Results.Ok();
     }).WithDescription("Switches receiving from one chat on or off.");
 
-app.MapPost("/telegram/otp", (TelegramAuthModel code) =>
-{
-    _otp = code.Code;
-});
+app.MapGet("/telegram/login", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.GetStatus, logger))
+    .WithDescription("What is needed next to log in to Telegram: the phone, the code, the password, or nothing.");
 
-app.MapPost("/telegram/password", (TelegramAuthModel code) =>
-{
-    _password = code.Code;
-});
+app.MapPost("/telegram/login", (ITelegramLogin login, ILogger<Program> logger, TelegramLoginValue request) =>
+        string.IsNullOrWhiteSpace(request.Value)
+            ? Task.FromResult(Results.Problem("Value is required", statusCode: StatusCodes.Status400BadRequest))
+            : TelegramLoginResult(() => login.Submit(request.Value), logger))
+    .WithDescription("Takes the value the login is waiting for and returns what is needed next.");
+
+app.MapPost("/telegram/logout", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.Logout, logger))
+    .WithDescription("Logs out of Telegram, or abandons a login that is waiting for a code or password.");
 
 using var scope = app.Services.CreateScope();
 await using var dbContext = scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>();
@@ -268,7 +234,19 @@ else
 
 app.Run();
 
-public class TelegramAuthModel
+static async Task<IResult> TelegramLoginResult(Func<Task<TelegramLoginStatus>> action, ILogger logger)
 {
-    public required string Code { get; set; }
+    try
+    {
+        return Results.Ok(await action());
+    }
+    catch (TelegramLoginException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Telegram login request failed");
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway);
+    }
 }

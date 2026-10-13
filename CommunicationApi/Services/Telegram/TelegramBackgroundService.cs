@@ -1,12 +1,11 @@
-﻿using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Shared;
 using TL;
-using WTelegram;
 
 namespace CommunicationApi.Services.Telegram;
 
-public class TelegramBackgroundService(IServiceProvider serviceProvider):BackgroundService
+public class TelegramBackgroundService(IServiceProvider serviceProvider, TelegramLogin login, ILogger<TelegramBackgroundService> logger):BackgroundService
 {
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -14,8 +13,10 @@ public class TelegramBackgroundService(IServiceProvider serviceProvider):Backgro
         var server = serviceProvider.GetRequiredService<IServer>();
         var feature = server.Features.Get<IServerAddressesFeature>();
         var addresses = feature.Addresses;
-        var telegramClient = serviceProvider.GetRequiredService<Client>();
-        await telegramClient.LoginUserIfNeeded();
+        var telegramClient = login.Client;
+        if (telegramClient == null)
+            return;
+
         telegramClient.OnUpdates += async (updates) =>
         {
             foreach (var u in updates.UpdateList)
@@ -37,6 +38,15 @@ public class TelegramBackgroundService(IServiceProvider serviceProvider):Backgro
                 }
             }
         };
+
+        try
+        {
+            await login.GetStatus();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not continue the saved Telegram session");
+        }
 
         await Task.Delay(-1, stoppingToken);
     }

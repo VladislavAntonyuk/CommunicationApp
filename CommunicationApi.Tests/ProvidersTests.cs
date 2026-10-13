@@ -93,17 +93,16 @@ public sealed class ProvidersTests : IDisposable
     }
 
     [Theory]
-    [InlineData("12345", "hash", "+380987654321", true)]
-    [InlineData("0", "hash", "+380987654321", false)]
-    [InlineData("12345", "", "+380987654321", false)]
-    [InlineData("12345", "hash", "", false)]
-    public async Task Get_TelegramConfigured_DependsOnSettings(string appId, string appHash, string phone, bool expected)
+    [InlineData("12345", "hash", true)]
+    [InlineData("0", "hash", false)]
+    [InlineData("", "hash", false)]
+    [InlineData("12345", "", false)]
+    public async Task Get_TelegramConfigured_DependsOnSettings(string appId, string appHash, bool expected)
     {
         var client = _factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Telegram:AppId", appId);
             builder.UseSetting("Telegram:AppHash", appHash);
-            builder.UseSetting("Telegram:Phone", phone);
         }).CreateClient();
 
         var providers = await Get(client);

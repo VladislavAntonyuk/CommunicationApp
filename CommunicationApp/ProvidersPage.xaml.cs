@@ -47,7 +47,6 @@ public partial class ProvidersPage : ContentPage
             var response = await httpClient.GetAsync($"{backend}/providers/{Target.Telegram}/chats");
             if (!response.IsSuccessStatusCode)
             {
-                // The server explains the failure, for example "Telegram is not logged in".
                 var problem = await response.Content.ReadFromJsonAsync<Problem>();
                 ShowChatsStatus(problem?.Detail ?? $"Server error ({(int)response.StatusCode})");
                 return;
@@ -72,7 +71,6 @@ public partial class ProvidersPage : ContentPage
 
     private async void Provider_OnToggled(object? sender, ToggledEventArgs e)
     {
-        // Also raised when the row is first shown with its saved value.
         if (sender is not Switch { BindingContext: ProviderRow row } toggle || e.Value == row.Enabled)
             return;
 
@@ -149,6 +147,5 @@ public class ChatRow(ChatStatus status) : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    // Puts the switch back to the saved value after a failed save.
     public void ResetSwitch() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Enabled)));
 }

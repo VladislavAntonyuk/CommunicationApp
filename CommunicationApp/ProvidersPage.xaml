@@ -6,7 +6,6 @@
              x:Class="CommunicationApp.ProvidersPage"
              Title="Providers">
 
-    <!-- The chat list can be long, so it is the scrolling list itself and the providers sit in its header. -->
     <CollectionView x:Name="Chats" IsGrouped="True" Margin="30,0">
         <CollectionView.Header>
             <VerticalStackLayout Spacing="25" Padding="0,0,0,25">

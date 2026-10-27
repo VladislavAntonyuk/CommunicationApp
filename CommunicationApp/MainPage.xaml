@@ -16,7 +16,6 @@
                 <Label Text="Forward automatically" VerticalOptions="Center" />
             </HorizontalStackLayout>
             <Button Text="Forward now" Clicked="CallButton_OnClicked" />
-            <Button Text="Providers" Clicked="ProvidersButton_OnClicked" />
             <Label Text="Forwarded messages" FontAttributes="Bold" />
             <CollectionView x:Name="History" EmptyView="Nothing forwarded yet">
                 <CollectionView.ItemTemplate>

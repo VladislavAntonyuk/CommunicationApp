@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using Shared;
 
-namespace CommunicationApp;
+namespace CommunicationClient;
 
 public partial class TelegramLoginPage : ContentPage
 {

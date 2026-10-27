@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Shared;
 
 namespace CommunicationClient.Services;
@@ -6,6 +7,8 @@ namespace CommunicationClient.Services;
 public class ApiClient(HttpClient httpClient, IPreferences preferences)
 {
     private string Backend => preferences.Get("backend", "");
+
+    public bool HasBackend => Uri.TryCreate(Backend, UriKind.Absolute, out _);
 
     public async Task<List<ProviderStatus>> GetProviders() =>
         await Read<List<ProviderStatus>>(await httpClient.GetAsync($"{Backend}/providers")) ?? [];
@@ -38,8 +41,25 @@ public class ApiClient(HttpClient httpClient, IPreferences preferences)
     private static async Task Check(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
-            throw new ServerException(await ServerError.Read(response));
+            throw new ServerException(await ErrorMessage(response));
     }
+
+    private static async Task<string> ErrorMessage(HttpResponseMessage response)
+    {
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<Problem>();
+            if (!string.IsNullOrEmpty(problem?.Detail))
+                return problem.Detail;
+        }
+        catch (JsonException)
+        {
+        }
+
+        return $"Server error ({(int)response.StatusCode})";
+    }
+
+    private sealed record Problem(string? Detail);
 }
 
 public class ServerException(string message) : Exception(message);

@@ -1,4 +1,5 @@
-﻿using CommunicationClient.ViewModels;
+﻿using CommunicationClient.Services;
+using CommunicationClient.ViewModels;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +20,7 @@ public static class MauiProgram
             });
 
         builder.Services.AddSingleton(Preferences.Default);
+        builder.Services.AddHttpClient<ApiClient>();
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<MainPageViewModel>();
 

@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 
-namespace CommunicationApp;
+namespace CommunicationClient;
 
 public static class ServerError
 {

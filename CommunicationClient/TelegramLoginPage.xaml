@@ -2,19 +2,40 @@
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:shared="clr-namespace:Shared;assembly=Shared"
+             xmlns:viewModels="clr-namespace:CommunicationClient.ViewModels"
              x:Class="CommunicationClient.TelegramLoginPage"
+             x:DataType="viewModels:TelegramLoginViewModel"
              Title="Telegram login">
+
+    <ContentPage.Resources>
+        <toolkit:IsStringNotNullOrEmptyConverter x:Key="IsNotEmpty" />
+    </ContentPage.Resources>
 
     <ScrollView>
         <VerticalStackLayout
             Padding="30,0"
             Spacing="25">
 
-            <Label x:Name="Prompt" Text="Loading..." />
-            <Entry x:Name="Value" IsVisible="False" Completed="Continue_OnClicked" />
-            <Label x:Name="Error" IsVisible="False" />
-            <Button x:Name="Continue" Text="Continue" IsVisible="False" Clicked="Continue_OnClicked" />
-            <Button x:Name="StartOver" Text="Start over" IsVisible="False" Clicked="StartOver_OnClicked" />
+            <Label Text="{Binding Prompt}" />
+            <Entry Text="{Binding Value}"
+                   Placeholder="{Binding Placeholder}"
+                   IsPassword="{Binding IsPassword}"
+                   IsVisible="{Binding AsksForValue}"
+                   ReturnCommand="{Binding ContinueCommand}">
+                <Entry.Triggers>
+                    <DataTrigger TargetType="Entry" Binding="{Binding Step}" Value="{x:Static shared:TelegramLoginStep.Phone}">
+                        <Setter Property="Keyboard" Value="Telephone" />
+                    </DataTrigger>
+                    <DataTrigger TargetType="Entry" Binding="{Binding Step}" Value="{x:Static shared:TelegramLoginStep.Code}">
+                        <Setter Property="Keyboard" Value="Numeric" />
+                    </DataTrigger>
+                </Entry.Triggers>
+            </Entry>
+            <Label Text="{Binding Error}" IsVisible="{Binding Error, Converter={StaticResource IsNotEmpty}}" />
+            <Button Text="Continue" IsVisible="{Binding AsksForValue}" Command="{Binding ContinueCommand}" />
+            <Button Text="Start over" IsVisible="{Binding CanStartOver}" Command="{Binding StartOverCommand}" />
         </VerticalStackLayout>
     </ScrollView>
 

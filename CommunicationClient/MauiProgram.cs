@@ -21,8 +21,11 @@ public static class MauiProgram
 
         builder.Services.AddSingleton(Preferences.Default);
         builder.Services.AddHttpClient<ApiClient>();
+        builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<MainPageViewModel>();
+        builder.Services.AddTransient<TelegramLoginPage>();
+        builder.Services.AddTransient<TelegramLoginViewModel>();
 
 #if DEBUG
         builder.Logging.AddDebug();

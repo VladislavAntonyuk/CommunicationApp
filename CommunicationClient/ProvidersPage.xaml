@@ -6,7 +6,14 @@
              xmlns:viewModels="clr-namespace:CommunicationClient.ViewModels"
              x:Class="CommunicationClient.ProvidersPage"
              x:DataType="viewModels:ProvidersViewModel"
+             x:Name="page"
              Title="Providers">
+
+    <ContentPage.Behaviors>
+        <toolkit:EventToCommandBehavior EventName="Appearing"
+                                        BindingContext="{Binding BindingContext, Source={x:Reference page}, x:DataType=ContentPage}"
+                                        Command="{Binding LoadCommand}" />
+    </ContentPage.Behaviors>
 
     <ContentPage.Resources>
         <toolkit:IsStringNotNullOrEmptyConverter x:Key="IsNotEmpty" />
@@ -21,7 +28,10 @@
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="viewModels:ProviderRow">
                             <HorizontalStackLayout Spacing="10">
-                                <Switch IsToggled="{Binding Enabled, Mode=OneWay}" IsEnabled="{Binding Configured}" Toggled="Provider_OnToggled" />
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleCommand}" />
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Switch IsToggled="{Binding Enabled, Mode=OneWay}" IsEnabled="{Binding Configured}" InputTransparent="True" />
                                 <Label Text="{Binding Title}" VerticalOptions="Center" />
                             </HorizontalStackLayout>
                         </DataTemplate>
@@ -30,7 +40,8 @@
                 <VerticalStackLayout Spacing="10" IsVisible="{Binding ShowsTelegram}">
                     <Label Text="Telegram account" FontAttributes="Bold" />
                     <Label Text="{Binding TelegramAccount}" />
-                    <Button Text="{Binding TelegramButtonText}" IsVisible="{Binding ShowsTelegramButton}" Command="{Binding LogInOrOutCommand}" />
+                    <Button Text="{Binding LoginText}" IsVisible="{Binding ShowsLogin}" Command="{Binding LoginCommand}" />
+                    <Button Text="Log out" IsVisible="{Binding ShowsLogout}" Command="{Binding LogoutCommand}" />
                 </VerticalStackLayout>
                 <Label Text="Telegram chats" FontAttributes="Bold" IsVisible="{Binding ShowsChats}" />
                 <Label Text="{Binding ChatsStatus}" IsVisible="{Binding ChatsStatus, Converter={StaticResource IsNotEmpty}}" />
@@ -44,7 +55,10 @@
         <CollectionView.ItemTemplate>
             <DataTemplate x:DataType="viewModels:ChatRow">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Padding="0,5">
-                    <Switch IsToggled="{Binding Enabled, Mode=OneWay}" Toggled="Chat_OnToggled" />
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding ToggleCommand}" />
+                    </Grid.GestureRecognizers>
+                    <Switch IsToggled="{Binding Enabled, Mode=OneWay}" InputTransparent="True" />
                     <Label Grid.Column="1" Text="{Binding Title}" LineBreakMode="TailTruncation" VerticalOptions="Center" />
                 </Grid>
             </DataTemplate>

@@ -5,7 +5,7 @@ using Shared;
 
 namespace CommunicationClient.ViewModels;
 
-public partial class ProvidersViewModel(ApiClient api, INavigationService navigation, IDialogService dialogs) : ObservableObject
+public partial class ProvidersViewModel(ICommunicationApi api, IPreferences preferences, INavigationService navigation, IDialogService dialogs) : ObservableObject
 {
     [ObservableProperty]
     public partial string? Status { get; set; }
@@ -20,7 +20,7 @@ public partial class ProvidersViewModel(ApiClient api, INavigationService naviga
     public partial string? TelegramAccount { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TelegramButtonText), nameof(ShowsTelegramButton))]
+    [NotifyPropertyChangedFor(nameof(LoginText), nameof(ShowsLogin), nameof(ShowsLogout))]
     public partial TelegramLoginStep? TelegramStep { get; set; }
 
     [ObservableProperty]
@@ -32,21 +32,18 @@ public partial class ProvidersViewModel(ApiClient api, INavigationService naviga
     [ObservableProperty]
     public partial List<ChatGroup>? ChatGroups { get; set; }
 
-    public string TelegramButtonText => TelegramStep switch
-    {
-        TelegramLoginStep.LoggedIn => "Log out",
-        TelegramLoginStep.Code or TelegramLoginStep.Password => "Continue login",
-        _ => "Log in"
-    };
+    public string LoginText => TelegramStep is TelegramLoginStep.Code or TelegramLoginStep.Password ? "Continue login" : "Log in";
 
-    public bool ShowsTelegramButton => TelegramStep != null;
+    public bool ShowsLogin => TelegramStep is not null and not TelegramLoginStep.LoggedIn;
+
+    public bool ShowsLogout => TelegramStep == TelegramLoginStep.LoggedIn;
 
     [RelayCommand]
     private async Task Load()
     {
         try
         {
-            if (!api.HasBackend)
+            if (BackendAddress.From(preferences) is null)
             {
                 Status = "Enter a valid backend URL on the main page";
                 return;
@@ -54,7 +51,7 @@ public partial class ProvidersViewModel(ApiClient api, INavigationService naviga
 
             Status = "Loading...";
             var providers = await api.GetProviders();
-            Providers = providers.Select(x => new ProviderRow(x)).ToList();
+            Providers = providers.Select(x => new ProviderRow(x, ToggleProvider)).ToList();
             Status = null;
 
             if (providers.Any(x => x is { Target: Target.Telegram, Configured: true }))
@@ -62,19 +59,16 @@ public partial class ProvidersViewModel(ApiClient api, INavigationService naviga
         }
         catch (Exception ex)
         {
-            Status = ForwardingError.Describe(ex);
+            Status = ApiError.Describe(ex);
         }
     }
 
     [RelayCommand]
-    private async Task LogInOrOut()
-    {
-        if (TelegramStep != TelegramLoginStep.LoggedIn)
-        {
-            await navigation.GoTo(nameof(TelegramLoginPage));
-            return;
-        }
+    private Task Login() => navigation.GoTo(nameof(TelegramLoginPage));
 
+    [RelayCommand]
+    private async Task Logout()
+    {
         if (!await dialogs.Confirm("Telegram", "Log out of Telegram on the server?", "Log out", "Cancel"))
             return;
 
@@ -85,7 +79,7 @@ public partial class ProvidersViewModel(ApiClient api, INavigationService naviga
         }
         catch (Exception ex)
         {
-            TelegramAccount = ForwardingError.Describe(ex);
+            TelegramAccount = ApiError.Describe(ex);
         }
     }
 
@@ -108,7 +102,7 @@ public partial class ProvidersViewModel(ApiClient api, INavigationService naviga
         }
         catch (Exception ex)
         {
-            TelegramAccount = ForwardingError.Describe(ex);
+            TelegramAccount = ApiError.Describe(ex);
             return;
         }
 
@@ -132,9 +126,9 @@ public partial class ProvidersViewModel(ApiClient api, INavigationService naviga
             var chats = await api.GetChats(Target.Telegram);
             ChatGroups = new[]
                 {
-                    new ChatGroup("Private chats", chats.Where(x => x.Kind == ChatKind.Private)),
-                    new ChatGroup("Groups", chats.Where(x => x.Kind == ChatKind.Group)),
-                    new ChatGroup("Channels", chats.Where(x => x.Kind == ChatKind.Channel))
+                    new ChatGroup("Private chats", chats.Where(x => x.Kind == ChatKind.Private), ToggleChat),
+                    new ChatGroup("Groups", chats.Where(x => x.Kind == ChatKind.Group), ToggleChat),
+                    new ChatGroup("Channels", chats.Where(x => x.Kind == ChatKind.Channel), ToggleChat)
                 }
                 .Where(x => x.Count > 0)
                 .ToList();
@@ -142,68 +136,68 @@ public partial class ProvidersViewModel(ApiClient api, INavigationService naviga
         }
         catch (Exception ex)
         {
-            ChatsStatus = ForwardingError.Describe(ex);
+            ChatsStatus = ApiError.Describe(ex);
         }
     }
 
-    public async Task SetProvider(ProviderRow row, bool enabled)
+    private async Task ToggleProvider(ProviderRow row)
     {
-        if (enabled == row.Enabled)
-            return;
-
+        var enabled = row.Enabled = !row.Enabled;
         try
         {
-            await api.SetProvider(row.Target, enabled);
-            row.Enabled = enabled;
+            await api.SetProvider(row.Target, new ProviderSwitch(enabled));
             Status = null;
         }
         catch (Exception ex)
         {
-            row.ResetSwitch();
-            Status = ForwardingError.Describe(ex);
+            row.Enabled = !enabled;
+            Status = ApiError.Describe(ex);
         }
     }
 
-    public async Task SetChat(ChatRow row, bool enabled)
+    private async Task ToggleChat(ChatRow row)
     {
-        // Also raised when a row is shown or reused for another chat while scrolling.
-        if (enabled == row.Enabled)
-            return;
-
+        var enabled = row.Enabled = !row.Enabled;
         try
         {
-            await api.SetChat(Target.Telegram, row.ChatId, enabled);
-            row.Enabled = enabled;
+            await api.SetChat(Target.Telegram, row.ChatId, new ProviderSwitch(enabled));
             ChatsStatus = null;
         }
         catch (Exception ex)
         {
-            row.ResetSwitch();
-            ChatsStatus = ForwardingError.Describe(ex);
+            row.Enabled = !enabled;
+            ChatsStatus = ApiError.Describe(ex);
         }
     }
 }
 
-public class ProviderRow(ProviderStatus status) : ObservableObject
+public partial class ProviderRow(ProviderStatus status, Func<ProviderRow, Task> toggle) : ObservableObject
 {
     public Target Target { get; } = status.Target;
     public string Title { get; } = status.Configured ? status.Target.ToString() : $"{status.Target} (not set up)";
     public bool Configured { get; } = status.Configured;
-    public bool Enabled { get; set; } = status.Enabled;
 
-    public void ResetSwitch() => OnPropertyChanged(nameof(Enabled));
+    [ObservableProperty]
+    public partial bool Enabled { get; set; } = status.Enabled;
+
+    [RelayCommand(CanExecute = nameof(Configured))]
+    private Task Toggle() => toggle(this);
 }
 
-public class ChatGroup(string title, IEnumerable<ChatStatus> chats) : List<ChatRow>(chats.Select(x => new ChatRow(x)))
+public class ChatGroup(string title, IEnumerable<ChatStatus> chats, Func<ChatRow, Task> toggle)
+    : List<ChatRow>(chats.Select(x => new ChatRow(x, toggle)))
 {
     public string Title { get; } = title;
 }
 
-public class ChatRow(ChatStatus status) : ObservableObject
+public partial class ChatRow(ChatStatus status, Func<ChatRow, Task> toggle) : ObservableObject
 {
     public string ChatId { get; } = status.ChatId;
     public string Title { get; } = status.Title;
-    public bool Enabled { get; set; } = status.Enabled;
 
-    public void ResetSwitch() => OnPropertyChanged(nameof(Enabled));
+    [ObservableProperty]
+    public partial bool Enabled { get; set; } = status.Enabled;
+
+    [RelayCommand]
+    private Task Toggle() => toggle(this);
 }

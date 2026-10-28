@@ -7,7 +7,14 @@
              xmlns:viewModels="clr-namespace:CommunicationClient.ViewModels"
              x:Class="CommunicationClient.TelegramLoginPage"
              x:DataType="viewModels:TelegramLoginViewModel"
+             x:Name="page"
              Title="Telegram login">
+
+    <ContentPage.Behaviors>
+        <toolkit:EventToCommandBehavior EventName="Appearing"
+                                        BindingContext="{Binding BindingContext, Source={x:Reference page}, x:DataType=ContentPage}"
+                                        Command="{Binding LoadCommand}" />
+    </ContentPage.Behaviors>
 
     <ContentPage.Resources>
         <toolkit:IsStringNotNullOrEmptyConverter x:Key="IsNotEmpty" />

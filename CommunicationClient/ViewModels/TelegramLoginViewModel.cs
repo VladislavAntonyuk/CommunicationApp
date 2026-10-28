@@ -1,11 +1,12 @@
 using CommunicationClient.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Refit;
 using Shared;
 
 namespace CommunicationClient.ViewModels;
 
-public partial class TelegramLoginViewModel(ApiClient api, INavigationService navigation) : ObservableObject
+public partial class TelegramLoginViewModel(ICommunicationApi api, INavigationService navigation) : ObservableObject
 {
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Prompt), nameof(Placeholder), nameof(IsPassword), nameof(AsksForValue), nameof(CanStartOver))]
@@ -53,7 +54,7 @@ public partial class TelegramLoginViewModel(ApiClient api, INavigationService na
             return;
 
         var value = Value;
-        await Send(() => api.SendTelegramLogin(value));
+        await Send(() => api.SendTelegramLogin(new TelegramLoginValue(value)));
     }
 
     [RelayCommand(CanExecute = nameof(CanSend))]
@@ -75,9 +76,9 @@ public partial class TelegramLoginViewModel(ApiClient api, INavigationService na
             {
                 status = await request();
             }
-            catch (ServerException ex)
+            catch (ApiException ex)
             {
-                Error = ex.Message;
+                Error = ApiError.Describe(ex);
                 status = await CurrentStatus();
             }
 
@@ -86,7 +87,7 @@ public partial class TelegramLoginViewModel(ApiClient api, INavigationService na
         }
         catch (Exception ex)
         {
-            Error = ForwardingError.Describe(ex);
+            Error = ApiError.Describe(ex);
         }
         finally
         {
@@ -100,7 +101,7 @@ public partial class TelegramLoginViewModel(ApiClient api, INavigationService na
         {
             return await api.GetTelegramLogin();
         }
-        catch (ServerException)
+        catch (ApiException)
         {
             return null;
         }

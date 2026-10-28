@@ -2,6 +2,7 @@
 using CommunicationClient.ViewModels;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
+using Refit;
 
 namespace CommunicationClient;
 
@@ -20,15 +21,13 @@ public static class MauiProgram
             });
 
         builder.Services.AddSingleton(Preferences.Default);
-        builder.Services.AddHttpClient<ApiClient>();
+        builder.Services.AddRefitGeneratedClient<ICommunicationApi>()
+            .ConfigureHttpClient((services, client) => client.BaseAddress = BackendAddress.From(services.GetRequiredService<IPreferences>()));
         builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
         builder.Services.AddSingleton<IDialogService, ShellDialogService>();
-        builder.Services.AddTransient<MainPage>();
-        builder.Services.AddTransient<MainPageViewModel>();
-        builder.Services.AddTransient<ProvidersPage>();
-        builder.Services.AddTransient<ProvidersViewModel>();
-        builder.Services.AddTransient<TelegramLoginPage>();
-        builder.Services.AddTransient<TelegramLoginViewModel>();
+        builder.Services.AddTransient<MainPage, MainPageViewModel>();
+        builder.Services.AddTransientWithShellRoute<ProvidersPage, ProvidersViewModel>(nameof(ProvidersPage));
+        builder.Services.AddTransientWithShellRoute<TelegramLoginPage, TelegramLoginViewModel>(nameof(TelegramLoginPage));
 
 #if DEBUG
         builder.Logging.AddDebug();

@@ -26,10 +26,14 @@
         <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
 
         <MauiFont Include="Resources\Fonts\*" />
+
+        <EmbeddedResource Include="appsettings.json" LogicalName="appsettings.json" />
+        <EmbeddedResource Include="appsettings.Development.json" LogicalName="appsettings.Development.json" Condition="'$(Configuration)' == 'Debug' And Exists('appsettings.Development.json')" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.14" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.41" />
         <PackageReference Include="CommunityToolkit.Maui" Version="14.0.1" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />

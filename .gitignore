@@ -487,3 +487,5 @@ CommunicationApi/appsettings.Development.json
 *.db
 *.db-shm
 *.db-wal
+
+CommunicationClient/appsettings.Development.json

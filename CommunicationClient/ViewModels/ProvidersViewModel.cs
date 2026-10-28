@@ -5,7 +5,7 @@ using Shared;
 
 namespace CommunicationClient.ViewModels;
 
-public partial class ProvidersViewModel(ICommunicationApi api, IPreferences preferences, INavigationService navigation, IDialogService dialogs) : ObservableObject
+public partial class ProvidersViewModel(ICommunicationApi api, INavigationService navigation, IDialogService dialogs) : ObservableObject
 {
     [ObservableProperty]
     public partial string? Status { get; set; }
@@ -41,26 +41,20 @@ public partial class ProvidersViewModel(ICommunicationApi api, IPreferences pref
     [RelayCommand]
     private async Task Load()
     {
-        try
+        Status = "Loading...";
+        var response = await api.GetProviders();
+        if (!response.IsSuccessfulWithContent)
         {
-            if (BackendAddress.From(preferences) is null)
-            {
-                Status = "Enter a valid backend URL on the main page";
-                return;
-            }
-
-            Status = "Loading...";
-            var providers = await api.GetProviders();
-            Providers = providers.Select(x => new ProviderRow(x, ToggleProvider)).ToList();
-            Status = null;
-
-            if (providers.Any(x => x is { Target: Target.Telegram, Configured: true }))
-                await LoadTelegram();
+            Status = response.ErrorMessage;
+            return;
         }
-        catch (Exception ex)
-        {
-            Status = ApiError.Describe(ex);
-        }
+
+        var providers = response.Content;
+        Providers = providers.Select(x => new ProviderRow(x, ToggleProvider)).ToList();
+        Status = null;
+
+        if (providers.Any(x => x is { Target: Target.Telegram, Configured: true }))
+            await LoadTelegram();
     }
 
     [RelayCommand]
@@ -72,15 +66,14 @@ public partial class ProvidersViewModel(ICommunicationApi api, IPreferences pref
         if (!await dialogs.Confirm("Telegram", "Log out of Telegram on the server?", "Log out", "Cancel"))
             return;
 
-        try
+        var response = await api.TelegramLogout();
+        if (!response.IsSuccessful)
         {
-            await api.TelegramLogout();
-            await LoadTelegram();
+            TelegramAccount = response.ErrorMessage;
+            return;
         }
-        catch (Exception ex)
-        {
-            TelegramAccount = ApiError.Describe(ex);
-        }
+
+        await LoadTelegram();
     }
 
     private async Task LoadTelegram()
@@ -88,23 +81,22 @@ public partial class ProvidersViewModel(ICommunicationApi api, IPreferences pref
         ShowsTelegram = true;
         TelegramStep = null;
         HideChats();
-        try
+        TelegramAccount = "Loading...";
+        var response = await api.GetTelegramLogin();
+        if (!response.IsSuccessfulWithContent)
         {
-            TelegramAccount = "Loading...";
-            var status = await api.GetTelegramLogin();
-            TelegramAccount = status?.Step switch
-            {
-                TelegramLoginStep.LoggedIn => $"Connected as {status.Account}",
-                TelegramLoginStep.Code or TelegramLoginStep.Password => "Login is not finished",
-                _ => "Not connected"
-            };
-            TelegramStep = status?.Step ?? TelegramLoginStep.NotConfigured;
-        }
-        catch (Exception ex)
-        {
-            TelegramAccount = ApiError.Describe(ex);
+            TelegramAccount = response.ErrorMessage;
             return;
         }
+
+        var status = response.Content;
+        TelegramAccount = status.Step switch
+        {
+            TelegramLoginStep.LoggedIn => $"Connected as {status.Account}",
+            TelegramLoginStep.Code or TelegramLoginStep.Password => "Login is not finished",
+            _ => "Not connected"
+        };
+        TelegramStep = status.Step;
 
         if (TelegramStep == TelegramLoginStep.LoggedIn)
             await LoadChats();
@@ -120,54 +112,52 @@ public partial class ProvidersViewModel(ICommunicationApi api, IPreferences pref
     private async Task LoadChats()
     {
         ShowsChats = true;
-        try
+        ChatsStatus = "Loading...";
+        var response = await api.GetChats(Target.Telegram);
+        if (!response.IsSuccessfulWithContent)
         {
-            ChatsStatus = "Loading...";
-            var chats = await api.GetChats(Target.Telegram);
-            ChatGroups = new[]
-                {
-                    new ChatGroup("Private chats", chats.Where(x => x.Kind == ChatKind.Private), ToggleChat),
-                    new ChatGroup("Groups", chats.Where(x => x.Kind == ChatKind.Group), ToggleChat),
-                    new ChatGroup("Channels", chats.Where(x => x.Kind == ChatKind.Channel), ToggleChat)
-                }
-                .Where(x => x.Count > 0)
-                .ToList();
-            ChatsStatus = chats.Count == 0 ? "No chats" : null;
+            ChatsStatus = response.ErrorMessage;
+            return;
         }
-        catch (Exception ex)
-        {
-            ChatsStatus = ApiError.Describe(ex);
-        }
+
+        var chats = response.Content;
+        ChatGroups = new[]
+            {
+                new ChatGroup("Private chats", chats.Where(x => x.Kind == ChatKind.Private), ToggleChat),
+                new ChatGroup("Groups", chats.Where(x => x.Kind == ChatKind.Group), ToggleChat),
+                new ChatGroup("Channels", chats.Where(x => x.Kind == ChatKind.Channel), ToggleChat)
+            }
+            .Where(x => x.Count > 0)
+            .ToList();
+        ChatsStatus = chats.Count == 0 ? "No chats" : null;
     }
 
     private async Task ToggleProvider(ProviderRow row)
     {
         var enabled = row.Enabled = !row.Enabled;
-        try
+        var response = await api.SetProvider(row.Target, new ProviderSwitch(enabled));
+        if (response.IsSuccessful)
         {
-            await api.SetProvider(row.Target, new ProviderSwitch(enabled));
             Status = null;
+            return;
         }
-        catch (Exception ex)
-        {
-            row.Enabled = !enabled;
-            Status = ApiError.Describe(ex);
-        }
+
+        row.Enabled = !enabled;
+        Status = response.ErrorMessage;
     }
 
     private async Task ToggleChat(ChatRow row)
     {
         var enabled = row.Enabled = !row.Enabled;
-        try
+        var response = await api.SetChat(Target.Telegram, row.ChatId, new ProviderSwitch(enabled));
+        if (response.IsSuccessful)
         {
-            await api.SetChat(Target.Telegram, row.ChatId, new ProviderSwitch(enabled));
             ChatsStatus = null;
+            return;
         }
-        catch (Exception ex)
-        {
-            row.Enabled = !enabled;
-            ChatsStatus = ApiError.Describe(ex);
-        }
+
+        row.Enabled = !enabled;
+        ChatsStatus = response.ErrorMessage;
     }
 }
 

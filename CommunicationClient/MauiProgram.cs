@@ -1,6 +1,7 @@
 ﻿using CommunicationClient.Services;
 using CommunicationClient.ViewModels;
 using CommunityToolkit.Maui;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Refit;
 
@@ -20,13 +21,19 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        builder.Services.AddSingleton(Preferences.Default);
+        foreach (var name in new[] { "appsettings.json", "appsettings.Development.json" })
+        {
+            var settings = typeof(MauiProgram).Assembly.GetManifestResourceStream(name);
+            if (settings != null)
+                builder.Configuration.AddJsonStream(settings);
+        }
+
+        var backend = new Uri(builder.Configuration["Backend"]!);
         builder.Services.AddRefitGeneratedClient<ICommunicationApi>()
-            .ConfigureHttpClient((services, client) => client.BaseAddress = BackendAddress.From(services.GetRequiredService<IPreferences>()));
+            .ConfigureHttpClient(client => client.BaseAddress = backend);
         builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
         builder.Services.AddSingleton<IDialogService, ShellDialogService>();
-        builder.Services.AddTransient<MainPage, MainPageViewModel>();
-        builder.Services.AddTransientWithShellRoute<ProvidersPage, ProvidersViewModel>(nameof(ProvidersPage));
+        builder.Services.AddTransient<ProvidersPage, ProvidersViewModel>();
         builder.Services.AddTransientWithShellRoute<TelegramLoginPage, TelegramLoginViewModel>(nameof(TelegramLoginPage));
 
 #if DEBUG

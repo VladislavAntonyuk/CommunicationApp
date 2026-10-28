@@ -62,7 +62,7 @@ public partial class TelegramLoginViewModel(ICommunicationApi api, INavigationSe
 
     private bool CanSend() => !IsBusy;
 
-    private async Task Send(Func<Task<TelegramLoginStatus?>> request)
+    private async Task Send(Func<Task<IApiResponse<TelegramLoginStatus>>> request)
     {
         if (IsBusy)
             return;
@@ -71,39 +71,22 @@ public partial class TelegramLoginViewModel(ICommunicationApi api, INavigationSe
         Error = null;
         try
         {
-            TelegramLoginStatus? status;
-            try
+            var response = await request();
+            if (!response.IsSuccessfulWithContent)
             {
-                status = await request();
-            }
-            catch (ApiException ex)
-            {
-                Error = ApiError.Describe(ex);
-                status = await CurrentStatus();
+                Error = response.ErrorMessage;
+                if (!response.IsReceived)
+                    return;
+
+                response = await api.GetTelegramLogin();
             }
 
-            if (status != null)
-                await Show(status);
-        }
-        catch (Exception ex)
-        {
-            Error = ApiError.Describe(ex);
+            if (response.IsSuccessfulWithContent)
+                await Show(response.Content);
         }
         finally
         {
             IsBusy = false;
-        }
-    }
-
-    private async Task<TelegramLoginStatus?> CurrentStatus()
-    {
-        try
-        {
-            return await api.GetTelegramLogin();
-        }
-        catch (ApiException)
-        {
-            return null;
         }
     }
 

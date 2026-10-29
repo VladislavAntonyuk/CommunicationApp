@@ -1,4 +1,5 @@
 ﻿using CommunicationApp.Services;
+using CommunicationApp.ViewModels;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -34,7 +35,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<ISmsSender, AndroidSmsSender>();
         builder.Services.AddSingleton<ForwardingStatus>();
         builder.Services.AddSingleton<MessageForwarder>();
-        builder.Services.AddTransient<MainPage>();
+        builder.Services.AddSingleton<ISmsPermissions, AndroidSmsPermissions>();
+        builder.Services.AddSingleton<IForwardingControl, ForwardingServiceControl>();
+        builder.Services.AddSingleton<INotifier, ToastNotifier>();
+        builder.Services.AddTransient<MainPage, MainPageViewModel>();
 
 #if DEBUG
         builder.Logging.AddDebug();

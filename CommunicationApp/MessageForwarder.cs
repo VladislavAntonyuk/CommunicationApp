@@ -1,5 +1,4 @@
-using System.Net.Http.Json;
-using Microsoft.Extensions.Configuration;
+using CommunicationApp.Services;
 using Shared;
 
 namespace CommunicationApp;
@@ -15,16 +14,19 @@ public static class MessageForwarder
         var sent = 0;
         try
         {
-            var backend = IPlatformApplication.Current!.Services.GetRequiredService<IConfiguration>()["Backend"];
+            var api = IPlatformApplication.Current!.Services.GetRequiredService<IGatewayApi>();
             var phoneNumber = Preferences.Get("from", "");
 
-            using var httpClient = new HttpClient();
-            var messages = await httpClient.GetFromJsonAsync<List<ReceivedMessage>>($"{backend}/receive") ?? [];
-            foreach (var item in messages)
+            var messages = await api.GetPending();
+            if (!messages.IsSuccessfulWithContent)
+                throw new InvalidOperationException(messages.ErrorMessage);
+
+            foreach (var item in messages.Content)
             {
                 SendSms(phoneNumber, item.Text);
-                var response = await httpClient.PostAsJsonAsync($"{backend}/receive/ack", new Acknowledgement([item.Id]));
-                response.EnsureSuccessStatusCode();
+                var response = await api.Acknowledge(new Acknowledgement([item.Id]));
+                if (!response.IsSuccessful)
+                    throw new InvalidOperationException(response.ErrorMessage);
                 sent++;
             }
 
@@ -33,9 +35,8 @@ public static class MessageForwarder
         }
         catch (Exception ex)
         {
-            var reason = ForwardingError.Describe(ex);
-            ForwardingStatus.Failed(sent, reason);
-            throw new InvalidOperationException($"Error after {sent} messages sent: {reason}", ex);
+            ForwardingStatus.Failed(sent, ex.Message);
+            throw new InvalidOperationException($"Error after {sent} messages sent: {ex.Message}", ex);
         }
         finally
         {

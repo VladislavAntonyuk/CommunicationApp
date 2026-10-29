@@ -1,8 +1,7 @@
-﻿using System.Net.Http.Json;
-using Android.App;
+﻿using Android.App;
 using Android.Content;
 using Android.Widget;
-using Microsoft.Extensions.Configuration;
+using CommunicationApp.Services;
 
 namespace CommunicationApp;
 
@@ -26,16 +25,15 @@ public class SmsReceiver : BroadcastReceiver
             var from = Preferences.Get("from", null);
             if (Shared.PhoneNumberMatcher.IsSameNumber(sender, from))
             {
-                using var httpClient = new HttpClient();
-                var backend = IPlatformApplication.Current!.Services.GetRequiredService<IConfiguration>()["Backend"];
-                var result = await httpClient.PostAsJsonAsync($"{backend}/send", new Shared.Message(body));
-                if (result.IsSuccessStatusCode)
+                var api = IPlatformApplication.Current!.Services.GetRequiredService<IGatewayApi>();
+                var result = await api.Send(new Shared.Message(body));
+                if (result.IsSuccessful)
                 {
                     Toast.MakeText(context, "SMS sent to API successfully!", ToastLength.Short)?.Show();
                 }
                 else
                 {
-                    Toast.MakeText(context, "Failed to send SMS to API: " + result.ReasonPhrase, ToastLength.Long)?.Show();
+                    Toast.MakeText(context, "Failed to send SMS to API: " + result.ErrorMessage, ToastLength.Long)?.Show();
                 }
             }
         }

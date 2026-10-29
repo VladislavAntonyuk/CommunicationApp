@@ -1,6 +1,8 @@
-﻿using CommunityToolkit.Maui;
+﻿using CommunicationApp.Services;
+using CommunityToolkit.Maui;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Refit;
 
 namespace CommunicationApp;
 
@@ -24,6 +26,10 @@ public static class MauiProgram
             if (settings != null)
                 builder.Configuration.AddJsonStream(settings);
         }
+
+        var backend = new Uri(builder.Configuration["Backend"]!);
+        builder.Services.AddRefitGeneratedClient<IGatewayApi>()
+            .ConfigureHttpClient(client => client.BaseAddress = backend);
 
 #if DEBUG
         builder.Logging.AddDebug();

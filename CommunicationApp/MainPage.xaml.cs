@@ -15,11 +15,9 @@ public partial class MainPage : ContentPage
         _loading = true;
         AutoForward.IsToggled = Preferences.Get("autoForward", false);
         _loading = false;
-#if ANDROID
         // The service does not survive a reboot or a force stop, so start it again if it was left on.
         if (AutoForward.IsToggled)
             ForwardingService.Start();
-#endif
     }
 
     protected override void OnAppearing()
@@ -92,7 +90,6 @@ public partial class MainPage : ContentPage
             }
 
             Preferences.Set("autoForward", e.Value);
-#if ANDROID
             if (e.Value)
             {
                 await Permissions.RequestAsync<Permissions.PostNotifications>();
@@ -102,7 +99,6 @@ public partial class MainPage : ContentPage
             {
                 ForwardingService.Stop();
             }
-#endif
         }
         catch (Exception ex)
         {
@@ -130,25 +126,19 @@ public partial class MainPage : ContentPage
             return false;
         }
 
-#if ANDROID
         if (AndroidX.Core.Content.ContextCompat.CheckSelfPermission(Platform.CurrentActivity, Android.Manifest.Permission.SendSms) != Android.Content.PM.Permission.Granted)
         {
             AndroidX.Core.App.ActivityCompat.RequestPermissions(Platform.CurrentActivity, new string[] { Android.Manifest.Permission.SendSms }, 1);
             await Notify("Allow sending SMS and try again");
             return false;
         }
-#endif
 
         return true;
     }
 
     private async Task Notify(string text)
     {
-#if ANDROID
         await Toast.Make(text).Show();
-#else
-        await DisplayAlertAsync("CommunicationApp", text, "OK");
-#endif
     }
 
     private void Backend_OnTextChanged(object? sender, TextChangedEventArgs e)

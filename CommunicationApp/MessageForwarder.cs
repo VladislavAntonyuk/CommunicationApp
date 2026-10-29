@@ -44,7 +44,6 @@ public static class MessageForwarder
 
     private static void SendSms(string phoneNumber, string message)
     {
-#if ANDROID
         try
         {
             var smsManager = (Android.Telephony.SmsManager?)Android.App.Application.Context.GetSystemService(Java.Lang.Class.FromType(typeof(Android.Telephony.SmsManager)));
@@ -62,7 +61,6 @@ public static class MessageForwarder
         {
             throw new SmsFailedException($"Could not send SMS: {ex.Message}", ex);
         }
-#endif
     }
 
     private sealed class SmsFailedException(string message, Exception inner) : Exception(message, inner);

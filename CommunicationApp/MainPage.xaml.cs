@@ -23,25 +23,20 @@ public partial class MainPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        ForwardingHistory.Changed += OnHistoryChanged;
-        ShowHistory();
+        ForwardingStatus.Changed += OnStatusChanged;
+        ShowStatus();
     }
 
     protected override void OnDisappearing()
     {
-        ForwardingHistory.Changed -= OnHistoryChanged;
+        ForwardingStatus.Changed -= OnStatusChanged;
         base.OnDisappearing();
     }
 
     // Raised by the background service too, so it may arrive on a non-UI thread.
-    private void OnHistoryChanged() => MainThread.BeginInvokeOnMainThread(ShowHistory);
+    private void OnStatusChanged() => MainThread.BeginInvokeOnMainThread(ShowStatus);
 
-    private void ShowHistory()
-    {
-        History.ItemsSource = ForwardingHistory.GetEntries()
-            .Select(x => $"{(x.Time.Date == DateTime.Today ? x.Time.ToString("HH:mm") : x.Time.ToString("dd MMM HH:mm"))}  {x.Source}  {x.Text}")
-            .ToList();
-    }
+    private void ShowStatus() => Status.Text = ForwardingStatus.Text;
 
     private async Task<PermissionStatus> CheckAndRequestSmsPermission()
     {

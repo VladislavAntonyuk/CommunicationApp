@@ -13,11 +13,8 @@ public class ForwardingService : Service
     private const int NotificationId = 1;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
-    private const string IdleText = "Forwarding messages";
-
     private CancellationTokenSource? _cts;
-    private string _lastForwardedText = IdleText;
-    private string _shownText = IdleText;
+    private string _shownText = ForwardingStatus.Text;
 
     public static void Start()
     {
@@ -41,6 +38,7 @@ public class ForwardingService : Service
         if (_cts == null)
         {
             _cts = new CancellationTokenSource();
+            ForwardingStatus.Changed += OnStatusChanged;
             _ = Run(_cts.Token);
         }
 
@@ -49,6 +47,7 @@ public class ForwardingService : Service
 
     public override void OnDestroy()
     {
+        ForwardingStatus.Changed -= OnStatusChanged;
         _cts?.Cancel();
         _cts = null;
         base.OnDestroy();
@@ -63,16 +62,11 @@ public class ForwardingService : Service
             {
                 try
                 {
-                    var sent = await MessageForwarder.ForwardPending();
-                    if (sent > 0)
-                        _lastForwardedText = $"Last forwarded: {sent} {(sent == 1 ? "message" : "messages")} at {DateTime.Now:HH:mm}";
-
-                    ShowText(_lastForwardedText, token);
+                    await MessageForwarder.ForwardPending();
                 }
                 catch (Exception ex)
                 {
                     Android.Util.Log.Warn(nameof(ForwardingService), ex.ToString());
-                    ShowText($"Last check failed at {DateTime.Now:HH:mm}", token);
                 }
             } while (await timer.WaitForNextTickAsync(token));
         }
@@ -81,10 +75,12 @@ public class ForwardingService : Service
         }
     }
 
-    private void ShowText(string text, CancellationToken token)
+    private void OnStatusChanged() => ShowText(ForwardingStatus.Text);
+
+    private void ShowText(string text)
     {
         // Posting after the service was stopped would bring the notification back.
-        if (token.IsCancellationRequested || text == _shownText)
+        if (_cts == null || text == _shownText)
             return;
 
         _shownText = text;

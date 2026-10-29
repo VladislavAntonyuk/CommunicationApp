@@ -22,18 +22,18 @@ public static class MessageForwarder
             foreach (var item in messages)
             {
                 SendSms(phoneNumber, item.Text);
-                ForwardingHistory.AddForwarded(item.Text);
                 var response = await httpClient.PostAsJsonAsync($"{backend}/receive/ack", new Acknowledgement([item.Id]));
                 response.EnsureSuccessStatusCode();
                 sent++;
             }
 
+            ForwardingStatus.Succeeded(sent);
             return sent;
         }
         catch (Exception ex)
         {
             var reason = ForwardingError.Describe(ex);
-            ForwardingHistory.AddFailure(reason);
+            ForwardingStatus.Failed(sent, reason);
             throw new InvalidOperationException($"Error after {sent} messages sent: {reason}", ex);
         }
         finally

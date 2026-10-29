@@ -489,3 +489,4 @@ CommunicationApi/appsettings.Development.json
 *.db-wal
 
 CommunicationClient/appsettings.Development.json
+CommunicationApp/appsettings.Development.json

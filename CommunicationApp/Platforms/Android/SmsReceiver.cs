@@ -2,6 +2,7 @@
 using Android.App;
 using Android.Content;
 using Android.Widget;
+using Microsoft.Extensions.Configuration;
 
 namespace CommunicationApp;
 
@@ -26,7 +27,8 @@ public class SmsReceiver : BroadcastReceiver
             if (Shared.PhoneNumberMatcher.IsSameNumber(sender, from))
             {
                 using var httpClient = new HttpClient();
-                var result = await httpClient.PostAsJsonAsync($"{Preferences.Get("backend", "")}/send", new Shared.Message(body));
+                var backend = IPlatformApplication.Current!.Services.GetRequiredService<IConfiguration>()["Backend"];
+                var result = await httpClient.PostAsJsonAsync($"{backend}/send", new Shared.Message(body));
                 if (result.IsSuccessStatusCode)
                 {
                     Toast.MakeText(context, "SMS sent to API successfully!", ToastLength.Short)?.Show();

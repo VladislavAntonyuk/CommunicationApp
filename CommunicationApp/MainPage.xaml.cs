@@ -10,7 +10,6 @@ public partial class MainPage : ContentPage
     {
         InitializeComponent();
         PhoneNumber.Text = Preferences.Get("from", "");
-        Backend.Text = Preferences.Get("backend", "");
 
         _loading = true;
         AutoForward.IsToggled = Preferences.Get("autoForward", false);
@@ -103,12 +102,6 @@ public partial class MainPage : ContentPage
 
     private async Task<bool> EnsureReadyToForward()
     {
-        if (!Uri.TryCreate(Backend.Text, UriKind.Absolute, out var backend) || (backend.Scheme != Uri.UriSchemeHttp && backend.Scheme != Uri.UriSchemeHttps))
-        {
-            await Notify("Enter a valid backend URL");
-            return false;
-        }
-
         if (string.IsNullOrWhiteSpace(PhoneNumber.Text))
         {
             await Notify("Enter a phone number");
@@ -134,10 +127,5 @@ public partial class MainPage : ContentPage
     private async Task Notify(string text)
     {
         await Toast.Make(text).Show();
-    }
-
-    private void Backend_OnTextChanged(object? sender, TextChangedEventArgs e)
-    {
-        Preferences.Set("backend", Backend.Text);
     }
 }

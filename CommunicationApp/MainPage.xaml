@@ -9,7 +9,6 @@
             Padding="30,0"
             Spacing="25">
 
-			<Entry x:Name="Backend" Placeholder="https://localhost:7001" TextChanged="Backend_OnTextChanged"></Entry>
             <Entry x:Name="PhoneNumber" Placeholder="From: +380987654321" TextChanged="PhoneNumber_OnTextChanged"></Entry>
             <HorizontalStackLayout Spacing="10">
                 <Switch x:Name="AutoForward" Toggled="AutoForward_OnToggled" />

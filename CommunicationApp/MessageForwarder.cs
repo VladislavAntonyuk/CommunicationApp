@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.Extensions.Configuration;
 using Shared;
 
 namespace CommunicationApp;
@@ -14,7 +15,7 @@ public static class MessageForwarder
         var sent = 0;
         try
         {
-            var backend = Preferences.Get("backend", "");
+            var backend = IPlatformApplication.Current!.Services.GetRequiredService<IConfiguration>()["Backend"];
             var phoneNumber = Preferences.Get("from", "");
 
             using var httpClient = new HttpClient();

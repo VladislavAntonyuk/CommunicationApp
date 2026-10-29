@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Maui;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace CommunicationApp;
@@ -16,6 +17,13 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
+
+        foreach (var name in new[] { "appsettings.json", "appsettings.Development.json" })
+        {
+            var settings = typeof(MauiProgram).Assembly.GetManifestResourceStream(name);
+            if (settings != null)
+                builder.Configuration.AddJsonStream(settings);
+        }
 
 #if DEBUG
         builder.Logging.AddDebug();

@@ -30,6 +30,11 @@ public static class MauiProgram
         var backend = new Uri(builder.Configuration["Backend"]!);
         builder.Services.AddRefitGeneratedClient<IGatewayApi>()
             .ConfigureHttpClient(client => client.BaseAddress = backend);
+        builder.Services.AddSingleton(Preferences.Default);
+        builder.Services.AddSingleton<ISmsSender, AndroidSmsSender>();
+        builder.Services.AddSingleton<ForwardingStatus>();
+        builder.Services.AddSingleton<MessageForwarder>();
+        builder.Services.AddTransient<MainPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

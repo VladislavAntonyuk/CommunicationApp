@@ -1,13 +1,18 @@
-﻿using CommunityToolkit.Maui.Alerts;
+﻿using CommunicationApp.Services;
+using CommunityToolkit.Maui.Alerts;
 
 namespace CommunicationApp;
 
 public partial class MainPage : ContentPage
 {
+    private readonly MessageForwarder _forwarder;
+    private readonly ForwardingStatus _status;
     private readonly bool _loading;
 
-    public MainPage()
+    public MainPage(MessageForwarder forwarder, ForwardingStatus status)
     {
+        _forwarder = forwarder;
+        _status = status;
         InitializeComponent();
         PhoneNumber.Text = Preferences.Get("from", "");
 
@@ -22,20 +27,20 @@ public partial class MainPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        ForwardingStatus.Changed += OnStatusChanged;
+        _status.Changed += OnStatusChanged;
         ShowStatus();
     }
 
     protected override void OnDisappearing()
     {
-        ForwardingStatus.Changed -= OnStatusChanged;
+        _status.Changed -= OnStatusChanged;
         base.OnDisappearing();
     }
 
     // Raised by the background service too, so it may arrive on a non-UI thread.
     private void OnStatusChanged() => MainThread.BeginInvokeOnMainThread(ShowStatus);
 
-    private void ShowStatus() => Status.Text = ForwardingStatus.Text;
+    private void ShowStatus() => Status.Text = _status.Text;
 
     private async Task<PermissionStatus> CheckAndRequestSmsPermission()
     {
@@ -60,9 +65,11 @@ public partial class MainPage : ContentPage
             if (!await EnsureReadyToForward())
                 return;
 
-            var sent = await MessageForwarder.ForwardPending();
+            var result = await _forwarder.ForwardPending();
 
-            await Notify($"{sent} messages sent");
+            await Notify(result.Error == null
+                ? $"{result.Sent} messages sent"
+                : $"Error after {result.Sent} messages sent: {result.Error}");
         }
         catch (Exception ex)
         {

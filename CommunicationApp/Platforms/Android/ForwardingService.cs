@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using AndroidX.Core.App;
+using CommunicationApp.Services;
 
 namespace CommunicationApp;
 
@@ -13,8 +14,18 @@ public class ForwardingService : Service
     private const int NotificationId = 1;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
+    private readonly ForwardingStatus _status;
+    private readonly MessageForwarder _forwarder;
     private CancellationTokenSource? _cts;
-    private string _shownText = ForwardingStatus.Text;
+    private string _shownText;
+
+    public ForwardingService()
+    {
+        var services = IPlatformApplication.Current!.Services;
+        _status = services.GetRequiredService<ForwardingStatus>();
+        _forwarder = services.GetRequiredService<MessageForwarder>();
+        _shownText = _status.Text;
+    }
 
     public static void Start()
     {
@@ -38,7 +49,7 @@ public class ForwardingService : Service
         if (_cts == null)
         {
             _cts = new CancellationTokenSource();
-            ForwardingStatus.Changed += OnStatusChanged;
+            _status.Changed += OnStatusChanged;
             _ = Run(_cts.Token);
         }
 
@@ -47,7 +58,7 @@ public class ForwardingService : Service
 
     public override void OnDestroy()
     {
-        ForwardingStatus.Changed -= OnStatusChanged;
+        _status.Changed -= OnStatusChanged;
         _cts?.Cancel();
         _cts = null;
         base.OnDestroy();
@@ -60,14 +71,7 @@ public class ForwardingService : Service
         {
             do
             {
-                try
-                {
-                    await MessageForwarder.ForwardPending();
-                }
-                catch (Exception ex)
-                {
-                    Android.Util.Log.Warn(nameof(ForwardingService), ex.ToString());
-                }
+                await _forwarder.ForwardPending();
             } while (await timer.WaitForNextTickAsync(token));
         }
         catch (System.OperationCanceledException)
@@ -75,7 +79,7 @@ public class ForwardingService : Service
         }
     }
 
-    private void OnStatusChanged() => ShowText(ForwardingStatus.Text);
+    private void OnStatusChanged() => ShowText(_status.Text);
 
     private void ShowText(string text)
     {

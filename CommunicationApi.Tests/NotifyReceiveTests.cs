@@ -36,11 +36,24 @@ public sealed class NotifyReceiveTests : IDisposable
     }
 
     [Fact]
-    public async Task Receive_NotAcknowledged_ReturnsMessagesAgain()
+    public async Task Receive_BeforeLeaseEnds_ReturnsNothing()
     {
         var client = _factory.CreateClient();
         await Notify(client, "Slack", "Slack|U1|first");
         await Receive(client);
+
+        var messages = await Receive(client);
+
+        Assert.Empty(messages);
+    }
+
+    [Fact]
+    public async Task Receive_NotAcknowledged_ReturnsMessagesAgainAfterLease()
+    {
+        var client = _factory.CreateClient();
+        await Notify(client, "Slack", "Slack|U1|first");
+        await Receive(client);
+        await WaitForLeaseToEnd();
 
         var messages = await Receive(client);
 
@@ -69,6 +82,7 @@ public sealed class NotifyReceiveTests : IDisposable
         var first = (await Receive(client))[0];
 
         await Acknowledge(client, [first.Id]);
+        await WaitForLeaseToEnd();
 
         Assert.Equal(new[] { "Slack|U1|second" }, (await Receive(client)).Select(x => x.Text).ToArray());
     }
@@ -79,7 +93,7 @@ public sealed class NotifyReceiveTests : IDisposable
         var client = _factory.CreateClient();
         await Notify(client, "Slack", "Slack|U1|first");
 
-        await Acknowledge(client, [12345]);
+        await Acknowledge(client, ["12345"]);
 
         Assert.Single(await Receive(client));
     }
@@ -106,7 +120,12 @@ public sealed class NotifyReceiveTests : IDisposable
         return await client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
     }
 
-    private static async Task Acknowledge(HttpClient client, IEnumerable<int> ids)
+    private static Task WaitForLeaseToEnd()
+    {
+        return Task.Delay(ApiFactory.QueueLeaseTime * 2, TestContext.Current.CancellationToken);
+    }
+
+    private static async Task Acknowledge(HttpClient client, IEnumerable<string> ids)
     {
         var response = await client.PostAsJsonAsync("/receive/ack", new Acknowledgement(ids.ToList()), TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();

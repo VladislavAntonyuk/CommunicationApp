@@ -1,5 +1,5 @@
 namespace Shared;
 
-public record ReceivedMessage(int Id, string Text);
+public record ReceivedMessage(string Id, string Text);
 
-public record Acknowledgement(List<int> Ids);
+public record Acknowledgement(List<string> Ids);

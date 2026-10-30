@@ -1,3 +1,4 @@
+using Azure.Storage.Queues;
 using CommunicationApi.Database;
 using CommunicationApi.Services.Email;
 using CommunicationApi.Services.Slack;
@@ -17,7 +18,11 @@ namespace CommunicationApi.Tests;
 
 public class ApiFactory : WebApplicationFactory<Program>
 {
+    private const string QueueConnectionString = "UseDevelopmentStorage=true";
+    public static readonly TimeSpan QueueLeaseTime = TimeSpan.FromSeconds(1);
+
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private readonly string _queueName = $"test-{Guid.NewGuid():N}";
 
     public FakeSenders Senders { get; } = new();
 
@@ -26,6 +31,10 @@ public class ApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _connection.Open();
+
+        builder.UseSetting("ConnectionStrings:MessageQueue", QueueConnectionString);
+        builder.UseSetting("MessageQueueName", _queueName);
+        builder.UseSetting("MessageQueueLeaseTime", QueueLeaseTime.ToString());
 
         builder.ConfigureTestServices(services =>
         {
@@ -55,5 +64,6 @@ public class ApiFactory : WebApplicationFactory<Program>
     {
         base.Dispose(disposing);
         _connection.Dispose();
+        new QueueClient(QueueConnectionString, _queueName).DeleteIfExists();
     }
 }

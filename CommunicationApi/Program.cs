@@ -1,4 +1,3 @@
-using Azure.Storage.Queues;
 using CommunicationApi.Database;
 using CommunicationApi.Services;
 using CommunicationApi.Services.Email;
@@ -20,11 +19,10 @@ builder.Services.Configure<HostOptions>(opts =>
 
 builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.Configure<MessageQueueSettings>(builder.Configuration.GetSection("MessageQueue"));
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
-builder.Services.AddSingleton(new QueueClient(builder.Configuration.GetConnectionString("MessageQueue"), builder.Configuration["MessageQueueName"],
-    new QueueClientOptions { MessageEncoding = QueueMessageEncoding.Base64 }));
-builder.Services.AddSingleton<IMessageQueue>(sp => new StorageQueue(sp.GetRequiredService<QueueClient>(),
-    builder.Configuration.GetValue<TimeSpan>("MessageQueueLeaseTime")));
+builder.AddAzureServiceBusClient("MessageQueue");
+builder.Services.AddSingleton<IMessageQueue, ServiceBusQueue>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<ISlackService, SlackService>();
@@ -210,8 +208,6 @@ if (dbContext.Database.IsRelational())
     dbContext.Database.Migrate();
 else
     dbContext.Database.EnsureCreated();
-
-await app.Services.GetRequiredService<QueueClient>().CreateIfNotExistsAsync();
 
 app.Run();
 

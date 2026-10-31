@@ -1,5 +1,9 @@
-﻿using CommunityToolkit.Maui;
+﻿using CommunicationApp.Services;
+using CommunicationApp.ViewModels;
+using CommunityToolkit.Maui;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Refit;
 
 namespace CommunicationApp;
 
@@ -16,6 +20,25 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
+
+        foreach (var name in new[] { "appsettings.json", "appsettings.Development.json" })
+        {
+            var settings = typeof(MauiProgram).Assembly.GetManifestResourceStream(name);
+            if (settings != null)
+                builder.Configuration.AddJsonStream(settings);
+        }
+
+        var backend = new Uri(builder.Configuration["Backend"]!);
+        builder.Services.AddRefitGeneratedClient<IGatewayApi>()
+            .ConfigureHttpClient(client => client.BaseAddress = backend);
+        builder.Services.AddSingleton(Preferences.Default);
+        builder.Services.AddSingleton<ISmsSender, AndroidSmsSender>();
+        builder.Services.AddSingleton<ForwardingStatus>();
+        builder.Services.AddSingleton<MessageForwarder>();
+        builder.Services.AddSingleton<ISmsPermissions, AndroidSmsPermissions>();
+        builder.Services.AddSingleton<IForwardingControl, ForwardingServiceControl>();
+        builder.Services.AddSingleton<INotifier, ToastNotifier>();
+        builder.Services.AddTransient<MainPage, MainPageViewModel>();
 
 #if DEBUG
         builder.Logging.AddDebug();

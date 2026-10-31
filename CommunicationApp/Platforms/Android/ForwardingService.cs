@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using AndroidX.Core.App;
+using CommunicationApp.Services;
 
 namespace CommunicationApp;
 
@@ -13,11 +14,18 @@ public class ForwardingService : Service
     private const int NotificationId = 1;
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
-    private const string IdleText = "Forwarding messages";
-
+    private readonly ForwardingStatus _status;
+    private readonly MessageForwarder _forwarder;
     private CancellationTokenSource? _cts;
-    private string _lastForwardedText = IdleText;
-    private string _shownText = IdleText;
+    private string _shownText;
+
+    public ForwardingService()
+    {
+        var services = IPlatformApplication.Current!.Services;
+        _status = services.GetRequiredService<ForwardingStatus>();
+        _forwarder = services.GetRequiredService<MessageForwarder>();
+        _shownText = _status.Text;
+    }
 
     public static void Start()
     {
@@ -41,6 +49,7 @@ public class ForwardingService : Service
         if (_cts == null)
         {
             _cts = new CancellationTokenSource();
+            _status.Changed += OnStatusChanged;
             _ = Run(_cts.Token);
         }
 
@@ -49,6 +58,7 @@ public class ForwardingService : Service
 
     public override void OnDestroy()
     {
+        _status.Changed -= OnStatusChanged;
         _cts?.Cancel();
         _cts = null;
         base.OnDestroy();
@@ -61,19 +71,7 @@ public class ForwardingService : Service
         {
             do
             {
-                try
-                {
-                    var sent = await MessageForwarder.ForwardPending();
-                    if (sent > 0)
-                        _lastForwardedText = $"Last forwarded: {sent} {(sent == 1 ? "message" : "messages")} at {DateTime.Now:HH:mm}";
-
-                    ShowText(_lastForwardedText, token);
-                }
-                catch (Exception ex)
-                {
-                    Android.Util.Log.Warn(nameof(ForwardingService), ex.ToString());
-                    ShowText($"Last check failed at {DateTime.Now:HH:mm}", token);
-                }
+                await _forwarder.ForwardPending();
             } while (await timer.WaitForNextTickAsync(token));
         }
         catch (System.OperationCanceledException)
@@ -81,10 +79,12 @@ public class ForwardingService : Service
         }
     }
 
-    private void ShowText(string text, CancellationToken token)
+    private void OnStatusChanged() => ShowText(_status.Text);
+
+    private void ShowText(string text)
     {
         // Posting after the service was stopped would bring the notification back.
-        if (token.IsCancellationRequested || text == _shownText)
+        if (_cts == null || text == _shownText)
             return;
 
         _shownText = text;

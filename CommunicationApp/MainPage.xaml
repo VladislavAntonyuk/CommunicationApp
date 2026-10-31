@@ -2,28 +2,36 @@
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="CommunicationApp.MainPage">
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:viewModels="clr-namespace:CommunicationApp.ViewModels"
+             x:Class="CommunicationApp.MainPage"
+             x:DataType="viewModels:MainPageViewModel"
+             x:Name="page">
+
+    <ContentPage.Behaviors>
+        <toolkit:EventToCommandBehavior EventName="Appearing"
+                                        BindingContext="{Binding BindingContext, Source={x:Reference page}, x:DataType=ContentPage}"
+                                        Command="{Binding AppearingCommand}" />
+        <toolkit:EventToCommandBehavior EventName="Disappearing"
+                                        BindingContext="{Binding BindingContext, Source={x:Reference page}, x:DataType=ContentPage}"
+                                        Command="{Binding DisappearingCommand}" />
+    </ContentPage.Behaviors>
 
     <ScrollView>
         <VerticalStackLayout
             Padding="30,0"
             Spacing="25">
 
-			<Entry x:Name="Backend" Placeholder="https://localhost:7001" TextChanged="Backend_OnTextChanged"></Entry>
-            <Entry x:Name="PhoneNumber" Placeholder="From: +380987654321" TextChanged="PhoneNumber_OnTextChanged"></Entry>
+            <Entry Text="{Binding PhoneNumber}" Placeholder="From: +380987654321" />
             <HorizontalStackLayout Spacing="10">
-                <Switch x:Name="AutoForward" Toggled="AutoForward_OnToggled" />
+                <HorizontalStackLayout.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding ToggleAutoForwardCommand}" />
+                </HorizontalStackLayout.GestureRecognizers>
+                <Switch IsToggled="{Binding AutoForward, Mode=OneWay}" InputTransparent="True" />
                 <Label Text="Forward automatically" VerticalOptions="Center" />
             </HorizontalStackLayout>
-            <Button Text="Forward now" Clicked="CallButton_OnClicked" />
-            <Label Text="Forwarded messages" FontAttributes="Bold" />
-            <CollectionView x:Name="History" EmptyView="Nothing forwarded yet">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="{x:Type x:String}">
-                        <Label Text="{Binding}" />
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+            <Button Text="Forward now" Command="{Binding ForwardNowCommand}" />
+            <Label Text="{Binding Status}" />
         </VerticalStackLayout>
     </ScrollView>
 

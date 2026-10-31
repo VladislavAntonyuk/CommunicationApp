@@ -1,6 +1,8 @@
+using Azure.Storage.Queues;
 using CommunicationApi.Database;
 using CommunicationApi.Services;
 using CommunicationApi.Services.Email;
+using CommunicationApi.Services.Queue;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
@@ -19,6 +21,10 @@ builder.Services.Configure<HostOptions>(opts =>
 builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
+builder.Services.AddSingleton(new QueueClient(builder.Configuration.GetConnectionString("MessageQueue"), builder.Configuration["MessageQueueName"],
+    new QueueClientOptions { MessageEncoding = QueueMessageEncoding.Base64 }));
+builder.Services.AddSingleton<IMessageQueue>(sp => new StorageQueue(sp.GetRequiredService<QueueClient>(),
+    builder.Configuration.GetValue<TimeSpan>("MessageQueueLeaseTime")));
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<ISlackService, SlackService>();
@@ -42,31 +48,11 @@ app.MapGet("/", () => {
 });
 
 app.MapGet("/receive",
-    async (CommunicationApiDbContext dbContext) =>
-    {
-        var messages = await dbContext.Messages
-            .Where(x => !x.IsRead)
-            .OrderBy(x => x.DateTime)
-            .ToListAsync();
-
-        return messages.Select(x => new ReceivedMessage(x.Id, x.Text));
-    }).WithDescription(
+    (IMessageQueue queue) => queue.Receive()).WithDescription(
     "This endpoint returns messages to Android client for back SMS. Messages are returned until they are acknowledged.");
 
 app.MapPost("/receive/ack",
-    async (CommunicationApiDbContext dbContext, Acknowledgement request) =>
-    {
-        var messages = await dbContext.Messages
-            .AsTracking()
-            .Where(x => !x.IsRead && request.Ids.Contains(x.Id))
-            .ToListAsync();
-        foreach (var item in messages)
-        {
-            item.IsRead = true;
-        }
-
-        await dbContext.SaveChangesAsync();
-    }).WithDescription(
+    (IMessageQueue queue, Acknowledgement request) => queue.Acknowledge(request.Ids)).WithDescription(
     "Android client confirms the messages it has sent as SMS, so they are not returned again.");
 
 app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> logger, Shared.Message message) =>
@@ -124,7 +110,7 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> l
     }
 }).WithDescription("Android client sends request to this endpoint.");
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Target target, Shared.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IMessageQueue queue, Target target, Shared.Message request) =>
 {
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;
@@ -136,14 +122,7 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Targ
             return;
     }
 
-    dbContext.Messages.Add(new CommunicationApiMessage
-    {
-        Text = request.Text,
-        DateTime = DateTime.UtcNow,
-        IsRead = false,
-        Target = target
-    });
-    await dbContext.SaveChangesAsync();
+    await queue.Enqueue(request.Text);
 }).WithDescription("Service sends webhooks on this endpoint.");
 
 app.MapGet("/providers",
@@ -231,6 +210,8 @@ if (dbContext.Database.IsRelational())
     dbContext.Database.Migrate();
 else
     dbContext.Database.EnsureCreated();
+
+await app.Services.GetRequiredService<QueueClient>().CreateIfNotExistsAsync();
 
 app.Run();
 

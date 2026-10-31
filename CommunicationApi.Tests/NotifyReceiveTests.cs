@@ -4,18 +4,12 @@ using Shared;
 
 namespace CommunicationApi.Tests;
 
-public sealed class NotifyReceiveTests : IDisposable
+public sealed class NotifyReceiveTests : ApiTest
 {
-    private readonly ApiFactory _factory = new();
-
-    public void Dispose() => _factory.Dispose();
-
     [Fact]
     public async Task Receive_NothingNotified_ReturnsEmpty()
     {
-        var client = _factory.CreateClient();
-
-        var messages = await Receive(client);
+        var messages = await Receive();
 
         Assert.Empty(messages);
     }
@@ -23,12 +17,11 @@ public sealed class NotifyReceiveTests : IDisposable
     [Fact]
     public async Task Receive_ReturnsNotifiedMessagesInOrder()
     {
-        var client = _factory.CreateClient();
-        await Notify(client, "Telegram", "Telegram|1|first");
-        await Notify(client, "Slack", "Slack|U1|second");
-        await Notify(client, "Telegram", "Telegram|1|third");
+        await Notify("Telegram", "Telegram|1|first");
+        await Notify("Slack", "Slack|U1|second");
+        await Notify("Telegram", "Telegram|1|third");
 
-        var messages = await Receive(client);
+        var messages = await Receive();
 
         Assert.Equal(
             new[] { "Telegram|1|first", "Slack|U1|second", "Telegram|1|third" },
@@ -36,39 +29,38 @@ public sealed class NotifyReceiveTests : IDisposable
     }
 
     [Fact]
-    public async Task Receive_BeforeLeaseEnds_ReturnsNothing()
+    public async Task Receive_NotAcknowledged_ReturnsMessagesAgain()
     {
-        var client = _factory.CreateClient();
-        await Notify(client, "Slack", "Slack|U1|first");
-        await Receive(client);
+        await Notify("Slack", "Slack|U1|first");
+        await Receive();
 
-        var messages = await Receive(client);
-
-        Assert.Empty(messages);
-    }
-
-    [Fact]
-    public async Task Receive_NotAcknowledged_ReturnsMessagesAgainAfterLease()
-    {
-        var client = _factory.CreateClient();
-        await Notify(client, "Slack", "Slack|U1|first");
-        await Receive(client);
-        await WaitForLeaseToEnd();
-
-        var messages = await Receive(client);
+        var messages = await Receive();
 
         Assert.Equal(new[] { "Slack|U1|first" }, messages.Select(x => x.Text).ToArray());
     }
 
     [Fact]
+    public async Task Receive_NotAcknowledged_ReturnsThemBeforeNewerMessages()
+    {
+        await Notify("Slack", "Slack|U1|first");
+        await Notify("Slack", "Slack|U1|second");
+        var first = (await Receive()).Single(x => x.Text == "Slack|U1|first");
+        await Acknowledge([first.Id]);
+        await Notify("Slack", "Slack|U1|third");
+
+        var messages = await Receive();
+
+        Assert.Equal(new[] { "Slack|U1|second", "Slack|U1|third" }, messages.Select(x => x.Text).ToArray());
+    }
+
+    [Fact]
     public async Task Acknowledge_MessagesAreNotReturnedAgain()
     {
-        var client = _factory.CreateClient();
-        await Notify(client, "Slack", "Slack|U1|first");
-        await Acknowledge(client, (await Receive(client)).Select(x => x.Id));
-        await Notify(client, "Slack", "Slack|U1|second");
+        await Notify("Slack", "Slack|U1|first");
+        await Acknowledge((await Receive()).Select(x => x.Id));
+        await Notify("Slack", "Slack|U1|second");
 
-        var messages = await Receive(client);
+        var messages = await Receive();
 
         Assert.Equal(new[] { "Slack|U1|second" }, messages.Select(x => x.Text).ToArray());
     }
@@ -76,58 +68,48 @@ public sealed class NotifyReceiveTests : IDisposable
     [Fact]
     public async Task Acknowledge_OnlyAcknowledgedMessagesAreRemoved()
     {
-        var client = _factory.CreateClient();
-        await Notify(client, "Slack", "Slack|U1|first");
-        await Notify(client, "Slack", "Slack|U1|second");
-        var first = (await Receive(client))[0];
+        await Notify("Slack", "Slack|U1|first");
+        await Notify("Slack", "Slack|U1|second");
+        var first = (await Receive())[0];
 
-        await Acknowledge(client, [first.Id]);
-        await WaitForLeaseToEnd();
+        await Acknowledge([first.Id]);
 
-        Assert.Equal(new[] { "Slack|U1|second" }, (await Receive(client)).Select(x => x.Text).ToArray());
+        Assert.Equal(new[] { "Slack|U1|second" }, (await Receive()).Select(x => x.Text).ToArray());
     }
 
     [Fact]
     public async Task Acknowledge_UnknownId_SucceedsAndChangesNothing()
     {
-        var client = _factory.CreateClient();
-        await Notify(client, "Slack", "Slack|U1|first");
+        await Notify("Slack", "Slack|U1|first");
 
-        await Acknowledge(client, ["12345"]);
+        await Acknowledge(["12345"]);
 
-        Assert.Single(await Receive(client));
+        Assert.Single(await Receive());
     }
 
     [Fact]
     public async Task Notify_UnknownTarget_ReturnsBadRequestAndStoresNothing()
     {
-        var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync("/notify/Viber", new Message("Viber|1|hello"), TestContext.Current.CancellationToken);
+        var response = await Client.PostAsJsonAsync("/notify/Viber", new Message("Viber|1|hello"), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Empty(await Receive(client));
+        Assert.Empty(await Receive());
     }
 
-    private static async Task Notify(HttpClient client, string target, string text)
+    private async Task Notify(string target, string text)
     {
-        var response = await client.PostAsJsonAsync($"/notify/{target}", new Message(text), TestContext.Current.CancellationToken);
+        var response = await Client.PostAsJsonAsync($"/notify/{target}", new Message(text), TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
-    private static async Task<List<ReceivedMessage>> Receive(HttpClient client)
+    private async Task<List<ReceivedMessage>> Receive()
     {
-        return await client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
+        return await Client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
     }
 
-    private static Task WaitForLeaseToEnd()
+    private async Task Acknowledge(IEnumerable<string> ids)
     {
-        return Task.Delay(ApiFactory.QueueLeaseTime * 2, TestContext.Current.CancellationToken);
-    }
-
-    private static async Task Acknowledge(HttpClient client, IEnumerable<string> ids)
-    {
-        var response = await client.PostAsJsonAsync("/receive/ack", new Acknowledgement(ids.ToList()), TestContext.Current.CancellationToken);
+        var response = await Client.PostAsJsonAsync("/receive/ack", new Acknowledgement(ids.ToList()), TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
     }
 }

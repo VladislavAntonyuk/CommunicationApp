@@ -1,4 +1,3 @@
-using Azure.Storage.Queues;
 using CommunicationApi.Database;
 using CommunicationApi.Services.Email;
 using CommunicationApi.Services.Slack;
@@ -16,11 +15,8 @@ using Microsoft.Extensions.Hosting;
 
 namespace CommunicationApi.Tests;
 
-public class ApiFactory : WebApplicationFactory<Program>
+public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private const string QueueConnectionString = "UseDevelopmentStorage=true";
-    public static readonly TimeSpan QueueLeaseTime = TimeSpan.FromSeconds(1);
-
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
     private readonly string _queueName = $"test-{Guid.NewGuid():N}";
 
@@ -28,25 +24,27 @@ public class ApiFactory : WebApplicationFactory<Program>
 
     public FakeTelegramLogin TelegramLogin { get; } = new();
 
+    public async ValueTask InitializeAsync()
+    {
+        await _connection.OpenAsync();
+        await ServiceBusFixture.Administration.CreateQueueAsync(_queueName);
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        await _connection.DisposeAsync();
+        await ServiceBusFixture.Administration.DeleteQueueAsync(_queueName);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        _connection.Open();
-
-        builder.UseSetting("ConnectionStrings:MessageQueue", QueueConnectionString);
-        builder.UseSetting("MessageQueueName", _queueName);
-        builder.UseSetting("MessageQueueLeaseTime", QueueLeaseTime.ToString());
+        builder.UseSetting("ConnectionStrings:MessageQueue", ServiceBusFixture.ConnectionString);
+        builder.UseSetting("MessageQueue:Name", _queueName);
 
         builder.ConfigureTestServices(services =>
         {
-            var listeners = services
-                .Where(x => x.ServiceType == typeof(IHostedService)
-                            && (x.ImplementationType == typeof(TelegramBackgroundService)
-                                || x.ImplementationType == typeof(SlackBackgroundService)))
-                .ToList();
-            foreach (var listener in listeners)
-            {
-                services.Remove(listener);
-            }
+            services.RemoveAll<IHostedService>();
 
             services.RemoveAll<IDbContextOptionsConfiguration<CommunicationApiDbContext>>();
             services.RemoveAll<DbContextOptions<CommunicationApiDbContext>>();
@@ -58,12 +56,5 @@ public class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<ISlackService>(Senders);
             services.AddSingleton<ITelegramLogin>(TelegramLogin);
         });
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        _connection.Dispose();
-        new QueueClient(QueueConnectionString, _queueName).DeleteIfExists();
     }
 }

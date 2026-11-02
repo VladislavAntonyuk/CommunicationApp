@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 using Shared;
 using Silverback.Configuration;
 using Silverback.Messaging.Configuration;
+using Silverback.Messaging.Messages;
+using Silverback.Messaging.Publishing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,7 +28,6 @@ builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builde
 builder.Services.AddSilverback()
     .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
     .AddBrokerClientsConfigurator<BrokerClientsConfigurator>();
-builder.Services.AddScoped<IMessagePublisher, MqttMessagePublisher>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<ISlackService, SlackService>();
@@ -104,7 +105,7 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> l
     }
 }).WithDescription("Android client sends request to this endpoint.");
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IMessagePublisher publisher, Target target, Shared.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, Target target, Shared.Message request) =>
 {
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;
@@ -116,7 +117,7 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IMes
             return;
     }
 
-    await publisher.Publish(request.Text);
+    await publisher.PublishAsync(new StringMessage(request.Text));
 }).WithDescription("Service sends webhooks on this endpoint.");
 
 app.MapGet("/providers",

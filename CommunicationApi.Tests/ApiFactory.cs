@@ -1,6 +1,5 @@
 using CommunicationApi.Database;
 using CommunicationApi.Services.Email;
-using CommunicationApi.Services.Messaging;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
@@ -13,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Silverback.Messaging.Publishing;
 
 namespace CommunicationApi.Tests;
 
@@ -29,7 +29,7 @@ public class ApiFactory : WebApplicationFactory<Program>
     protected virtual void ConfigureMessaging(IServiceCollection services)
     {
         services.RemoveAll<IHostedService>();
-        services.AddSingleton<IMessagePublisher>(Publisher);
+        services.AddSingleton<IPublisher>(Publisher);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

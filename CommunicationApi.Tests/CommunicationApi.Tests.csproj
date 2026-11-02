@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\CommunicationApp\Services\MessageListener.cs" Link="Gateway\MessageListener.cs" />
     <None Include="..\CommunicationApp.AppHost\mosquitto\mosquitto.conf" Link="mosquitto.conf" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

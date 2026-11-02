@@ -5,12 +5,8 @@ using Shared;
 
 namespace CommunicationApi.Tests;
 
-public sealed class SendRoutingTests : IDisposable
+public sealed class SendRoutingTests : ApiTest
 {
-    private readonly ApiFactory _factory = new();
-
-    public void Dispose() => _factory.Dispose();
-
     [Theory]
     [InlineData("Telegram|123|hello", Target.Telegram, "123", "hello")]
     [InlineData("Teams|19:abc@thread.v2|hello", Target.Teams, "19:abc@thread.v2", "hello")]
@@ -25,7 +21,7 @@ public sealed class SendRoutingTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(
             new[] { new SentMessage(target, recipient, null, sentText) },
-            _factory.Senders.Sent);
+            Factory.Senders.Sent);
     }
 
     [Theory]
@@ -38,13 +34,13 @@ public sealed class SendRoutingTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(
             new[] { new SentMessage(Target.Email, "a@b.c", subject, sentText) },
-            _factory.Senders.Sent);
+            Factory.Senders.Sent);
     }
 
     [Fact]
     public async Task Send_EmailStatusInDifferentCase_ReturnsOk()
     {
-        _factory.Senders.EmailStatus = "Success";
+        Factory.Senders.EmailStatus = "Success";
 
         var response = await Send("Email|a@b.c|Subject|Body");
 
@@ -54,7 +50,7 @@ public sealed class SendRoutingTests : IDisposable
     [Fact]
     public async Task Send_EmailNotSent_ReturnsBadGateway()
     {
-        _factory.Senders.EmailStatus = "error";
+        Factory.Senders.EmailStatus = "error";
 
         var response = await Send("Email|a@b.c|Subject|Body");
 
@@ -70,7 +66,7 @@ public sealed class SendRoutingTests : IDisposable
     [InlineData("Slack|#general|hello")]
     public async Task Send_ServiceThrows_ReturnsBadGatewayWithMessage(string text)
     {
-        _factory.Senders.Exception = new InvalidOperationException("channel_not_found");
+        Factory.Senders.Exception = new InvalidOperationException("channel_not_found");
 
         var response = await Send(text);
 
@@ -81,6 +77,6 @@ public sealed class SendRoutingTests : IDisposable
 
     private Task<HttpResponseMessage> Send(string text)
     {
-        return _factory.CreateClient().PostAsJsonAsync("/send", new Message(text), TestContext.Current.CancellationToken);
+        return Client.PostAsJsonAsync("/send", new Message(text), TestContext.Current.CancellationToken);
     }
 }

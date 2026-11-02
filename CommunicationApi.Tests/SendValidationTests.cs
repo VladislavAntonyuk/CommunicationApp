@@ -5,12 +5,8 @@ using Shared;
 
 namespace CommunicationApi.Tests;
 
-public sealed class SendValidationTests : IDisposable
+public sealed class SendValidationTests : ApiTest
 {
-    private readonly ApiFactory _factory = new();
-
-    public void Dispose() => _factory.Dispose();
-
     [Theory]
     [InlineData("", "Text is required")]
     [InlineData("   ", "Text is required")]
@@ -27,13 +23,11 @@ public sealed class SendValidationTests : IDisposable
     [InlineData("Telegram||hello", "Telegram recipient must be a numeric chat id")]
     public async Task Send_InvalidText_ReturnsBadRequest(string text, string expectedDetail)
     {
-        var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync("/send", new Message(text), TestContext.Current.CancellationToken);
+        var response = await Client.PostAsJsonAsync("/send", new Message(text), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
         Assert.Equal(expectedDetail, problem?.Detail);
-        Assert.Empty(_factory.Senders.Sent);
+        Assert.Empty(Factory.Senders.Sent);
     }
 }

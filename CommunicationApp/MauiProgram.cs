@@ -31,6 +31,12 @@ public static class MauiProgram
         var backend = new Uri(builder.Configuration["Backend"]!);
         builder.Services.AddRefitGeneratedClient<IGatewayApi>()
             .ConfigureHttpClient(client => client.BaseAddress = backend);
+        builder.Services.AddSingleton(new MessageListener(
+            new Uri(builder.Configuration["Mqtt:Broker"]!),
+            builder.Configuration["Mqtt:ClientId"]!,
+            builder.Configuration["Mqtt:Topic"]!,
+            builder.Configuration["Mqtt:FailedTopic"]!,
+            TimeSpan.FromSeconds(5)));
         builder.Services.AddSingleton(Preferences.Default);
         builder.Services.AddSingleton<ISmsSender, AndroidSmsSender>();
         builder.Services.AddSingleton<ForwardingStatus>();

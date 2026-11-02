@@ -12,7 +12,6 @@ public class ForwardingService : Service
 {
     private const string ChannelId = "forwarding";
     private const int NotificationId = 1;
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
     private readonly ForwardingStatus _status;
     private readonly MessageForwarder _forwarder;
@@ -66,13 +65,9 @@ public class ForwardingService : Service
 
     private async Task Run(CancellationToken token)
     {
-        using var timer = new PeriodicTimer(Interval);
         try
         {
-            do
-            {
-                await _forwarder.ForwardPending();
-            } while (await timer.WaitForNextTickAsync(token));
+            await _forwarder.Listen(token);
         }
         catch (System.OperationCanceledException)
         {

@@ -30,7 +30,6 @@
                 <Switch IsToggled="{Binding AutoForward, Mode=OneWay}" InputTransparent="True" />
                 <Label Text="Forward automatically" VerticalOptions="Center" />
             </HorizontalStackLayout>
-            <Button Text="Forward now" Command="{Binding ForwardNowCommand}" />
             <Label Text="{Binding Status}" />
         </VerticalStackLayout>
     </ScrollView>

@@ -11,33 +11,33 @@ public sealed class ChatFilterTests : ApiTest
     [InlineData(ChatKind.Private, true)]
     [InlineData(ChatKind.Group, false)]
     [InlineData(ChatKind.Channel, false)]
-    public async Task Notify_ChatNotSwitched_FollowsDefaultForKind(ChatKind kind, bool stored)
+    public async Task Notify_ChatNotSwitched_FollowsDefaultForKind(ChatKind kind, bool published)
     {
         await Notify(new Message("Telegram|1|hello", "1", kind));
 
-        Assert.Equal(stored ? 1 : 0, (await Receive()).Count);
+        Assert.Equal(published ? 1 : 0, Factory.Publisher.Published.Count);
     }
 
     [Theory]
     [InlineData(ChatKind.Group)]
     [InlineData(ChatKind.Channel)]
-    public async Task Notify_ChatSwitchedOn_MessageIsStored(ChatKind kind)
+    public async Task Notify_ChatSwitchedOn_MessageIsPublished(ChatKind kind)
     {
         await SaveChat("1", true);
 
         await Notify(new Message("Telegram|1|hello", "1", kind));
 
-        Assert.Single(await Receive());
+        Assert.Single(Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_PrivateChatSwitchedOff_MessageIsNotStored()
+    public async Task Notify_PrivateChatSwitchedOff_MessageIsNotPublished()
     {
         await SaveChat("1", false);
 
         await Notify(new Message("Telegram|1|hello", "1", ChatKind.Private));
 
-        Assert.Empty(await Receive());
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public sealed class ChatFilterTests : ApiTest
 
         await Notify(new Message("Telegram|1|hello", "1", ChatKind.Channel));
 
-        Assert.Empty(await Receive());
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
@@ -57,23 +57,23 @@ public sealed class ChatFilterTests : ApiTest
 
         await Notify(new Message("Telegram|1|hello", "1", ChatKind.Channel));
 
-        Assert.Empty(await Receive());
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_ChatIdWithoutKind_MessageIsNotStored()
+    public async Task Notify_ChatIdWithoutKind_MessageIsNotPublished()
     {
         await Notify(new Message("Telegram|1|hello", "1"));
 
-        Assert.Empty(await Receive());
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_NoChatId_MessageIsStored()
+    public async Task Notify_NoChatId_MessageIsPublished()
     {
         await Notify(new Message("Slack|U1|hello"), "Slack");
 
-        Assert.Single(await Receive());
+        Assert.Single(Factory.Publisher.Published);
     }
 
     private async Task SaveChat(string chatId, bool enabled, Target target = Target.Telegram)
@@ -88,10 +88,5 @@ public sealed class ChatFilterTests : ApiTest
     {
         var response = await Client.PostAsJsonAsync($"/notify/{target}", message, TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-    }
-
-    private async Task<List<ReceivedMessage>> Receive()
-    {
-        return await Client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
     }
 }

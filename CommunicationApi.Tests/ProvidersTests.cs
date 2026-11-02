@@ -112,27 +112,27 @@ public sealed class ProvidersTests : ApiTest
     }
 
     [Fact]
-    public async Task Notify_ProviderSwitchedOff_MessageIsNotStored()
+    public async Task Notify_ProviderSwitchedOff_MessageIsNotPublished()
     {
         await Put("Telegram", false);
 
         await Notify("Telegram", "Telegram|1|hello");
 
-        Assert.Empty(await Receive());
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_OtherProviderSwitchedOff_MessageIsStored()
+    public async Task Notify_OtherProviderSwitchedOff_MessageIsPublished()
     {
         await Put("Telegram", false);
 
         await Notify("Slack", "Slack|U1|hello");
 
-        Assert.Equal(new[] { "Slack|U1|hello" }, (await Receive()).Select(x => x.Text).ToArray());
+        Assert.Equal(new[] { "Slack|U1|hello" }, Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_ProviderSwitchedBackOn_NewMessagesAreStored()
+    public async Task Notify_ProviderSwitchedBackOn_NewMessagesArePublished()
     {
         await Put("Telegram", false);
         await Notify("Telegram", "Telegram|1|while off");
@@ -140,28 +140,13 @@ public sealed class ProvidersTests : ApiTest
 
         await Notify("Telegram", "Telegram|1|after on");
 
-        Assert.Equal(new[] { "Telegram|1|after on" }, (await Receive()).Select(x => x.Text).ToArray());
-    }
-
-    [Fact]
-    public async Task SwitchOff_MessagesAlreadyStoredAreStillReturned()
-    {
-        await Notify("Telegram", "Telegram|1|before off");
-
-        await Put("Telegram", false);
-
-        Assert.Equal(new[] { "Telegram|1|before off" }, (await Receive()).Select(x => x.Text).ToArray());
+        Assert.Equal(new[] { "Telegram|1|after on" }, Factory.Publisher.Published);
     }
 
     private async Task Notify(string target, string text)
     {
         var response = await Client.PostAsJsonAsync($"/notify/{target}", new Message(text), TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-    }
-
-    private async Task<List<ReceivedMessage>> Receive()
-    {
-        return await Client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
     }
 
     private static async Task<List<ProviderStatus>> Get(HttpClient client)

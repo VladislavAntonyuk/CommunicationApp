@@ -1,11 +1,14 @@
 using CommunicationApi.Database;
 using CommunicationApi.Services;
 using CommunicationApi.Services.Email;
+using CommunicationApi.Services.Messaging;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
 using Microsoft.EntityFrameworkCore;
 using Shared;
+using Silverback.Configuration;
+using Silverback.Messaging.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,7 +21,12 @@ builder.Services.Configure<HostOptions>(opts =>
 
 builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"));
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
+builder.Services.AddSilverback()
+    .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
+    .AddBrokerClientsConfigurator<BrokerClientsConfigurator>();
+builder.Services.AddScoped<IMessagePublisher, MqttMessagePublisher>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<ISlackService, SlackService>();
@@ -40,34 +48,6 @@ app.UseHttpsRedirection();
 app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
-
-app.MapGet("/receive",
-    async (CommunicationApiDbContext dbContext) =>
-    {
-        var messages = await dbContext.Messages
-            .Where(x => !x.IsRead)
-            .OrderBy(x => x.DateTime)
-            .ToListAsync();
-
-        return messages.Select(x => new ReceivedMessage(x.Id, x.Text));
-    }).WithDescription(
-    "This endpoint returns messages to Android client for back SMS. Messages are returned until they are acknowledged.");
-
-app.MapPost("/receive/ack",
-    async (CommunicationApiDbContext dbContext, Acknowledgement request) =>
-    {
-        var messages = await dbContext.Messages
-            .AsTracking()
-            .Where(x => !x.IsRead && request.Ids.Contains(x.Id))
-            .ToListAsync();
-        foreach (var item in messages)
-        {
-            item.IsRead = true;
-        }
-
-        await dbContext.SaveChangesAsync();
-    }).WithDescription(
-    "Android client confirms the messages it has sent as SMS, so they are not returned again.");
 
 app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> logger, Shared.Message message) =>
 {
@@ -124,7 +104,7 @@ app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> l
     }
 }).WithDescription("Android client sends request to this endpoint.");
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Target target, Shared.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IMessagePublisher publisher, Target target, Shared.Message request) =>
 {
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;
@@ -136,14 +116,7 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, Targ
             return;
     }
 
-    dbContext.Messages.Add(new CommunicationApiMessage
-    {
-        Text = request.Text,
-        DateTime = DateTime.UtcNow,
-        IsRead = false,
-        Target = target
-    });
-    await dbContext.SaveChangesAsync();
+    await publisher.Publish(request.Text);
 }).WithDescription("Service sends webhooks on this endpoint.");
 
 app.MapGet("/providers",

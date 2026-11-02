@@ -68,13 +68,13 @@ public sealed class ChatsTests : ApiTest
     }
 
     [Fact]
-    public async Task Put_SwitchChannelOn_ItsMessagesAreStored()
+    public async Task Put_SwitchChannelOn_ItsMessagesArePublished()
     {
         await Put("3", true);
 
         await Client.PostAsJsonAsync("/notify/Telegram", new Message("Telegram|3|hello", "3", ChatKind.Channel), TestContext.Current.CancellationToken);
 
-        Assert.Equal(new[] { "Telegram|3|hello" }, (await Receive()).Select(x => x.Text).ToArray());
+        Assert.Equal(new[] { "Telegram|3|hello" }, Factory.Publisher.Published);
     }
 
     [Theory]
@@ -107,11 +107,6 @@ public sealed class ChatsTests : ApiTest
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
         Assert.Equal("Telegram is not logged in", problem?.Detail);
-    }
-
-    private async Task<List<ReceivedMessage>> Receive()
-    {
-        return await Client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
     }
 
     private async Task<List<ChatStatus>> Get()

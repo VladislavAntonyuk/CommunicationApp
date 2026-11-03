@@ -1,11 +1,8 @@
 namespace CommunicationApp.Services;
 
-public sealed class MessageForwarder(MessageListener listener, ISmsSender smsSender, ForwardingStatus status, IPreferences preferences)
+public sealed class MessageForwarder(ISmsSender smsSender, ForwardingStatus status, IPreferences preferences) : IMessageHandler
 {
-    public Task Listen(CancellationToken token) =>
-        listener.Run(Forward, () => status.Succeeded(0), reason => status.Failed(0, reason), token);
-
-    private Task Forward(string text)
+    public Task Handle(string text)
     {
         try
         {
@@ -21,4 +18,8 @@ public sealed class MessageForwarder(MessageListener listener, ISmsSender smsSen
         status.Succeeded(1);
         return Task.CompletedTask;
     }
+
+    public void Connected() => status.Succeeded(0);
+
+    public void Failed(string reason) => status.Failed(0, reason);
 }

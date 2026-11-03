@@ -1,4 +1,5 @@
 using CommunicationApp.Services;
+using Microsoft.Extensions.DependencyInjection;
 using MQTTnet;
 using MQTTnet.Formatter;
 using MQTTnet.Protocol;
@@ -77,19 +78,31 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
     [Fact]
     public async Task BrokerUnreachable_ReportsFailure()
     {
-        var failed = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var listener = new MessageListener(new Uri("mqtt://localhost:1"), _clientId, _topic, _failedTopic, TimeSpan.FromMilliseconds(10));
+        var handler = new Recorder(0);
+        await using var services = NewServices(new Uri("mqtt://localhost:1"), handler);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
 
-        var running = listener.Run(_ => Task.CompletedTask, () => { }, reason => failed.TrySetResult(reason), stop.Token);
-        var reason = await failed.Task.WaitAsync(Timeout, Token);
+        var running = services.GetRequiredService<MessageListener>().Run(stop.Token);
+        var reason = await handler.FailedReason.WaitAsync(Timeout, Token);
         await stop.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
 
         Assert.Equal("Not connected to the broker", reason);
     }
 
-    private MessageListener NewListener() => new(mosquitto.Broker, _clientId, _topic, _failedTopic, TimeSpan.FromMilliseconds(10));
+    private ServiceProvider NewServices(Uri broker, IMessageHandler handler) => new ServiceCollection()
+        .AddLogging()
+        .Configure<MqttSettings>(settings =>
+        {
+            settings.Broker = broker;
+            settings.ClientId = _clientId;
+            settings.Topic = _topic;
+            settings.FailedTopic = _failedTopic;
+            settings.RetryDelay = TimeSpan.FromMilliseconds(10);
+        })
+        .AddSingleton(handler)
+        .AddMessageListener()
+        .BuildServiceProvider();
 
     private async Task RegisterSession()
     {
@@ -117,11 +130,11 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
     private async Task RunUntil(Recorder handled, TimeSpan? settle = null)
     {
-        var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var services = NewServices(mosquitto.Broker, handled);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
 
-        var running = NewListener().Run(handled.Handle, connected.SetResult, _ => { }, stop.Token);
-        await connected.Task.WaitAsync(Timeout, Token);
+        var running = services.GetRequiredService<MessageListener>().Run(stop.Token);
+        await handled.IsConnected.WaitAsync(Timeout, Token);
         await handled.Done.WaitAsync(Timeout, Token);
         await Task.Delay(settle ?? TimeSpan.FromMilliseconds(200), Token);
         await stop.CancelAsync();
@@ -158,9 +171,11 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         await client.DisconnectAsync(cancellationToken: Token);
     }
 
-    private sealed class Recorder(int expected, Action<string>? check = null)
+    private sealed class Recorder(int expected, Action<string>? check = null) : IMessageHandler
     {
         private readonly TaskCompletionSource _done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<string> _failed = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Recorder(int expected, Action check) : this(expected, _ => check())
         {
@@ -170,6 +185,10 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
         public Task Done => expected == 0 ? Task.CompletedTask : _done.Task;
 
+        public Task IsConnected => _connected.Task;
+
+        public Task<string> FailedReason => _failed.Task;
+
         public Task Handle(string text)
         {
             check?.Invoke(text);
@@ -178,5 +197,9 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
                 _done.TrySetResult();
             return Task.CompletedTask;
         }
+
+        public void Connected() => _connected.TrySetResult();
+
+        public void Failed(string reason) => _failed.TrySetResult(reason);
     }
 }

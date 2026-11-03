@@ -2,10 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.Internal;
-using Microsoft.Extensions.Options;
-using MQTTnet;
-using MQTTnet.Formatter;
-using MQTTnet.Protocol;
 using Silverback.Configuration;
 using Silverback.Messaging.Broker;
 using Silverback.Messaging.Broker.Callbacks;
@@ -18,7 +14,6 @@ namespace CommunicationApp.Services;
 public sealed class MessageListener(
     IBrokerClientsConnector connector,
     IConsumerCollection consumers,
-    IOptions<MqttSettings> options,
     IMessageHandler handler) : IMqttClientConnectedCallback
 {
     private static readonly TimeSpan StatusInterval = TimeSpan.FromSeconds(10);
@@ -49,40 +44,10 @@ public sealed class MessageListener(
         }
     }
 
-    public async Task OnClientConnectedAsync(MqttClientConfiguration configuration)
+    public Task OnClientConnectedAsync(MqttClientConfiguration configuration)
     {
-        try
-        {
-            await KeepFailedMessages();
-            handler.Connected();
-        }
-        catch (Exception ex)
-        {
-            handler.Failed(ex.Message);
-        }
-    }
-
-    private async Task KeepFailedMessages()
-    {
-        var settings = options.Value;
-        using var client = new MqttClientFactory().CreateMqttClient();
-        client.ApplicationMessageReceivedAsync += e =>
-        {
-            e.AutoAcknowledge = false;
-            return Task.CompletedTask;
-        };
-
-        await client.ConnectAsync(new MqttClientOptionsBuilder()
-            .WithConnectionUri(settings.Broker)
-            .WithClientId($"{settings.ClientId}-failed")
-            .WithProtocolVersion(MqttProtocolVersion.V500)
-            .WithCleanStart(false)
-            .WithSessionExpiryInterval((uint)settings.SessionExpiry.TotalSeconds)
-            .Build());
-        await client.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
-            .WithTopicFilter(filter => filter.WithTopic(settings.FailedTopic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
-            .Build());
-        await client.DisconnectAsync();
+        handler.Connected();
+        return Task.CompletedTask;
     }
 }
 

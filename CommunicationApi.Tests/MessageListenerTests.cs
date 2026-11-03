@@ -12,7 +12,6 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
     private readonly string _clientId = $"gateway-{Guid.NewGuid():N}";
     private readonly string _topic = $"messages/{Guid.NewGuid():N}";
-    private readonly string _failedTopic = $"failed/{Guid.NewGuid():N}";
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -59,7 +58,7 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
     }
 
     [Fact]
-    public async Task HandlerKeepsFailing_MovesMessageAndContinues()
+    public async Task HandlerKeepsFailing_SkipsMessageAndContinues()
     {
         await RegisterSession();
         await Publish("bad", "good");
@@ -72,7 +71,6 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         await RunUntil(handled);
 
         Assert.Equal(new[] { "good" }, handled.Texts);
-        Assert.Equal("bad", await ReadFailedMessage());
     }
 
     [Fact]
@@ -97,7 +95,6 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
             settings.Broker = broker;
             settings.ClientId = _clientId;
             settings.Topic = _topic;
-            settings.FailedTopic = _failedTopic;
             settings.RetryDelay = TimeSpan.FromMilliseconds(10);
         })
         .AddSingleton(handler)
@@ -106,27 +103,19 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
     private async Task RegisterSession()
     {
-        await Subscribe(_clientId, _topic);
-        await Subscribe($"{_clientId}-failed", _failedTopic);
-    }
-
-    private async Task Subscribe(string clientId, string topic)
-    {
         using var client = new MqttClientFactory().CreateMqttClient();
-        await client.ConnectAsync(SessionOptions(clientId), Token);
+        await client.ConnectAsync(new MqttClientOptionsBuilder()
+            .WithConnectionUri(mosquitto.Broker)
+            .WithClientId(_clientId)
+            .WithProtocolVersion(MqttProtocolVersion.V500)
+            .WithCleanStart(false)
+            .WithSessionExpiryInterval(60)
+            .Build(), Token);
         await client.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
-            .WithTopicFilter(f => f.WithTopic(topic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
+            .WithTopicFilter(f => f.WithTopic(_topic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
             .Build(), Token);
         await client.DisconnectAsync(cancellationToken: Token);
     }
-
-    private MqttClientOptions SessionOptions(string clientId) => new MqttClientOptionsBuilder()
-        .WithConnectionUri(mosquitto.Broker)
-        .WithClientId(clientId)
-        .WithProtocolVersion(MqttProtocolVersion.V500)
-        .WithCleanStart(false)
-        .WithSessionExpiryInterval(60)
-        .Build();
 
     private async Task RunUntil(Recorder handled, TimeSpan? settle = null)
     {
@@ -139,20 +128,6 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         await Task.Delay(settle ?? TimeSpan.FromMilliseconds(200), Token);
         await stop.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
-    }
-
-    private async Task<string> ReadFailedMessage()
-    {
-        var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var client = new MqttClientFactory().CreateMqttClient();
-        client.ApplicationMessageReceivedAsync += e =>
-        {
-            received.TrySetResult(e.ApplicationMessage.ConvertPayloadToString());
-            return Task.CompletedTask;
-        };
-
-        await client.ConnectAsync(SessionOptions($"{_clientId}-failed"), Token);
-        return await received.Task.WaitAsync(Timeout, Token);
     }
 
     private async Task Publish(params string[] texts)

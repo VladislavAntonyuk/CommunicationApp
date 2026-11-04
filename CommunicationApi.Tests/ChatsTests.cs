@@ -6,13 +6,11 @@ using Shared;
 
 namespace CommunicationApi.Tests;
 
-public sealed class ChatsTests : IDisposable
+public sealed class ChatsTests : ApiTest
 {
-    private readonly ApiFactory _factory = new();
-
     public ChatsTests()
     {
-        _factory.Senders.TelegramChats.AddRange(
+        Factory.Senders.TelegramChats.AddRange(
         [
             new TelegramChat("1", "Olena", ChatKind.Private),
             new TelegramChat("2", "Family", ChatKind.Group),
@@ -20,14 +18,10 @@ public sealed class ChatsTests : IDisposable
         ]);
     }
 
-    public void Dispose() => _factory.Dispose();
-
     [Fact]
     public async Task Get_NothingSaved_ReturnsChatsWithDefaults()
     {
-        var client = _factory.CreateClient();
-
-        var chats = await Get(client);
+        var chats = await Get();
 
         Assert.Equal(
             new[]
@@ -42,9 +36,7 @@ public sealed class ChatsTests : IDisposable
     [Fact]
     public async Task Get_ReturnsKindAsName()
     {
-        var client = _factory.CreateClient();
-
-        var json = await client.GetStringAsync("/providers/Telegram/chats", TestContext.Current.CancellationToken);
+        var json = await Client.GetStringAsync("/providers/Telegram/chats", TestContext.Current.CancellationToken);
 
         Assert.Contains("\"kind\":\"Channel\"", json);
     }
@@ -52,44 +44,37 @@ public sealed class ChatsTests : IDisposable
     [Fact]
     public async Task Put_SwitchChannelOn_OnlyThatChatChanges()
     {
-        var client = _factory.CreateClient();
+        await Put("3", true);
 
-        await Put(client, "3", true);
-
-        Assert.Equal(new[] { true, false, true }, (await Get(client)).Select(x => x.Enabled).ToArray());
+        Assert.Equal(new[] { true, false, true }, (await Get()).Select(x => x.Enabled).ToArray());
     }
 
     [Fact]
     public async Task Put_SwitchPrivateChatOff_ChatIsDisabled()
     {
-        var client = _factory.CreateClient();
+        await Put("1", false);
 
-        await Put(client, "1", false);
-
-        Assert.False((await Get(client)).Single(x => x.ChatId == "1").Enabled);
+        Assert.False((await Get()).Single(x => x.ChatId == "1").Enabled);
     }
 
     [Fact]
     public async Task Put_SwitchOnThenOff_ChatIsDisabled()
     {
-        var client = _factory.CreateClient();
-        await Put(client, "3", true);
+        await Put("3", true);
 
-        await Put(client, "3", false);
+        await Put("3", false);
 
-        Assert.False((await Get(client)).Single(x => x.ChatId == "3").Enabled);
+        Assert.False((await Get()).Single(x => x.ChatId == "3").Enabled);
     }
 
     [Fact]
-    public async Task Put_SwitchChannelOn_ItsMessagesAreStored()
+    public async Task Put_SwitchChannelOn_ItsMessagesArePublished()
     {
-        var client = _factory.CreateClient();
-        await Put(client, "3", true);
+        await Put("3", true);
 
-        await client.PostAsJsonAsync("/notify/Telegram", new Message("Telegram|3|hello", "3", ChatKind.Channel), TestContext.Current.CancellationToken);
+        await Client.PostAsJsonAsync("/notify/Telegram", new Message("Telegram|3|hello", "3", ChatKind.Channel), TestContext.Current.CancellationToken);
 
-        var messages = await client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken);
-        Assert.Equal(new[] { "Telegram|3|hello" }, messages?.Select(x => x.Text).ToArray());
+        Assert.Equal(new[] { "Telegram|3|hello" }, Factory.Publisher.Published);
     }
 
     [Theory]
@@ -97,9 +82,7 @@ public sealed class ChatsTests : IDisposable
     [InlineData("Email")]
     public async Task Get_ProviderWithoutChatSelection_ReturnsBadRequest(string target)
     {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync($"/providers/{target}/chats", TestContext.Current.CancellationToken);
+        var response = await Client.GetAsync($"/providers/{target}/chats", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
@@ -109,9 +92,7 @@ public sealed class ChatsTests : IDisposable
     [Fact]
     public async Task Put_ProviderWithoutChatSelection_ReturnsBadRequest()
     {
-        var client = _factory.CreateClient();
-
-        var response = await client.PutAsJsonAsync("/providers/Slack/chats/C1", new ProviderSwitch(true), TestContext.Current.CancellationToken);
+        var response = await Client.PutAsJsonAsync("/providers/Slack/chats/C1", new ProviderSwitch(true), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -119,24 +100,23 @@ public sealed class ChatsTests : IDisposable
     [Fact]
     public async Task Get_TelegramFails_ReturnsBadGatewayWithReason()
     {
-        _factory.Senders.Exception = new InvalidOperationException("Telegram is not logged in");
-        var client = _factory.CreateClient();
+        Factory.Senders.Exception = new InvalidOperationException("Telegram is not logged in");
 
-        var response = await client.GetAsync("/providers/Telegram/chats", TestContext.Current.CancellationToken);
+        var response = await Client.GetAsync("/providers/Telegram/chats", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
         Assert.Equal("Telegram is not logged in", problem?.Detail);
     }
 
-    private static async Task<List<ChatStatus>> Get(HttpClient client)
+    private async Task<List<ChatStatus>> Get()
     {
-        return await client.GetFromJsonAsync<List<ChatStatus>>("/providers/Telegram/chats", TestContext.Current.CancellationToken) ?? [];
+        return await Client.GetFromJsonAsync<List<ChatStatus>>("/providers/Telegram/chats", TestContext.Current.CancellationToken) ?? [];
     }
 
-    private static async Task Put(HttpClient client, string chatId, bool enabled)
+    private async Task Put(string chatId, bool enabled)
     {
-        var response = await client.PutAsJsonAsync($"/providers/Telegram/chats/{chatId}", new ProviderSwitch(enabled), TestContext.Current.CancellationToken);
+        var response = await Client.PutAsJsonAsync($"/providers/Telegram/chats/{chatId}", new ProviderSwitch(enabled), TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
     }
 }

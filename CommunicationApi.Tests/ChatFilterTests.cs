@@ -5,107 +5,88 @@ using Shared;
 
 namespace CommunicationApi.Tests;
 
-public sealed class ChatFilterTests : IDisposable
+public sealed class ChatFilterTests : ApiTest
 {
-    private readonly ApiFactory _factory = new();
-
-    public void Dispose() => _factory.Dispose();
-
     [Theory]
     [InlineData(ChatKind.Private, true)]
     [InlineData(ChatKind.Group, false)]
     [InlineData(ChatKind.Channel, false)]
-    public async Task Notify_ChatNotSwitched_FollowsDefaultForKind(ChatKind kind, bool stored)
+    public async Task Notify_ChatNotSwitched_FollowsDefaultForKind(ChatKind kind, bool published)
     {
-        var client = _factory.CreateClient();
+        await Notify(new Message("Telegram|1|hello", "1", kind));
 
-        await Notify(client, new Message("Telegram|1|hello", "1", kind));
-
-        Assert.Equal(stored ? 1 : 0, (await Receive(client)).Count);
+        Assert.Equal(published ? 1 : 0, Factory.Publisher.Published.Count);
     }
 
     [Theory]
     [InlineData(ChatKind.Group)]
     [InlineData(ChatKind.Channel)]
-    public async Task Notify_ChatSwitchedOn_MessageIsStored(ChatKind kind)
+    public async Task Notify_ChatSwitchedOn_MessageIsPublished(ChatKind kind)
     {
-        var client = _factory.CreateClient();
         await SaveChat("1", true);
 
-        await Notify(client, new Message("Telegram|1|hello", "1", kind));
+        await Notify(new Message("Telegram|1|hello", "1", kind));
 
-        Assert.Single(await Receive(client));
+        Assert.Single(Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_PrivateChatSwitchedOff_MessageIsNotStored()
+    public async Task Notify_PrivateChatSwitchedOff_MessageIsNotPublished()
     {
-        var client = _factory.CreateClient();
         await SaveChat("1", false);
 
-        await Notify(client, new Message("Telegram|1|hello", "1", ChatKind.Private));
+        await Notify(new Message("Telegram|1|hello", "1", ChatKind.Private));
 
-        Assert.Empty(await Receive(client));
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
     public async Task Notify_OtherChatSwitched_DoesNotAffectThisChat()
     {
-        var client = _factory.CreateClient();
         await SaveChat("2", true);
 
-        await Notify(client, new Message("Telegram|1|hello", "1", ChatKind.Channel));
+        await Notify(new Message("Telegram|1|hello", "1", ChatKind.Channel));
 
-        Assert.Empty(await Receive(client));
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
     public async Task Notify_SameChatIdSwitchedForOtherProvider_DoesNotAffectThisProvider()
     {
-        var client = _factory.CreateClient();
         await SaveChat("1", true, Target.Slack);
 
-        await Notify(client, new Message("Telegram|1|hello", "1", ChatKind.Channel));
+        await Notify(new Message("Telegram|1|hello", "1", ChatKind.Channel));
 
-        Assert.Empty(await Receive(client));
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_ChatIdWithoutKind_MessageIsNotStored()
+    public async Task Notify_ChatIdWithoutKind_MessageIsNotPublished()
     {
-        var client = _factory.CreateClient();
+        await Notify(new Message("Telegram|1|hello", "1"));
 
-        await Notify(client, new Message("Telegram|1|hello", "1"));
-
-        Assert.Empty(await Receive(client));
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_NoChatId_MessageIsStored()
+    public async Task Notify_NoChatId_MessageIsPublished()
     {
-        var client = _factory.CreateClient();
+        await Notify(new Message("Slack|U1|hello"), "Slack");
 
-        await Notify(client, new Message("Slack|U1|hello"), "Slack");
-
-        Assert.Single(await Receive(client));
+        Assert.Single(Factory.Publisher.Published);
     }
 
     private async Task SaveChat(string chatId, bool enabled, Target target = Target.Telegram)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = Factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>();
         dbContext.ChatSettings.Add(new ChatSetting { Target = target, ChatId = chatId, Enabled = enabled });
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
-    private static async Task Notify(HttpClient client, Message message, string target = "Telegram")
+    private async Task Notify(Message message, string target = "Telegram")
     {
-        var response = await client.PostAsJsonAsync($"/notify/{target}", message, TestContext.Current.CancellationToken);
+        var response = await Client.PostAsJsonAsync($"/notify/{target}", message, TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-    }
-
-    private static async Task<List<ReceivedMessage>> Receive(HttpClient client)
-    {
-        return await client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
     }
 }

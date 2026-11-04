@@ -5,7 +5,6 @@ using CommunityToolkit.Mvvm.Input;
 namespace CommunicationApp.ViewModels;
 
 public partial class MainPageViewModel(
-    MessageForwarder forwarder,
     ForwardingStatus status,
     IPreferences preferences,
     ISmsPermissions permissions,
@@ -35,18 +34,6 @@ public partial class MainPageViewModel(
 
     [RelayCommand]
     private void Disappearing() => status.Changed -= OnStatusChanged;
-
-    [RelayCommand]
-    private async Task ForwardNow()
-    {
-        if (!await EnsureReadyToForward())
-            return;
-
-        var result = await forwarder.ForwardPending();
-        await notifier.Show(result.Error == null
-            ? $"{result.Sent} messages sent"
-            : $"Error after {result.Sent} messages sent: {result.Error}");
-    }
 
     [RelayCommand]
     private async Task ToggleAutoForward()

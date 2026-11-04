@@ -1,56 +1,25 @@
-using Shared;
-
 namespace CommunicationApp.Services;
 
-public sealed class MessageForwarder(IGatewayApi api, ISmsSender smsSender, ForwardingStatus status, IPreferences preferences)
+public sealed class MessageForwarder(ISmsSender smsSender, ForwardingStatus status, IPreferences preferences) : IMessageHandler
 {
-    // The button and the background service must not forward at the same time, or the same message is sent twice.
-    private readonly SemaphoreSlim _gate = new(1, 1);
-
-    public async Task<ForwardResult> ForwardPending()
+    public Task Handle(string text)
     {
-        await _gate.WaitAsync();
         try
         {
-            var result = await Forward();
-            if (result.Error == null)
-                status.Succeeded(result.Sent);
-            else
-                status.Failed(result.Sent, result.Error);
-            return result;
+            smsSender.Send(preferences.Get("from", ""), text);
         }
-        finally
+        catch (Exception ex)
         {
-            _gate.Release();
+            var reason = $"Could not send SMS: {ex.Message}";
+            status.Failed(0, reason);
+            throw new InvalidOperationException(reason, ex);
         }
+
+        status.Succeeded(1);
+        return Task.CompletedTask;
     }
 
-    private async Task<ForwardResult> Forward()
-    {
-        var phoneNumber = preferences.Get("from", "");
+    public void Connected() => status.Succeeded(0);
 
-        var messages = await api.GetPending();
-        if (!messages.IsSuccessfulWithContent)
-            return new ForwardResult(0, messages.ErrorMessage);
-
-        var sent = 0;
-        foreach (var item in messages.Content)
-        {
-            try
-            {
-                smsSender.Send(phoneNumber, item.Text);
-            }
-            catch (Exception ex)
-            {
-                return new ForwardResult(sent, $"Could not send SMS: {ex.Message}");
-            }
-
-            var response = await api.Acknowledge(new Acknowledgement([item.Id]));
-            if (!response.IsSuccessful)
-                return new ForwardResult(sent, response.ErrorMessage);
-            sent++;
-        }
-
-        return new ForwardResult(sent, null);
-    }
+    public void Failed(string reason) => status.Failed(0, reason);
 }

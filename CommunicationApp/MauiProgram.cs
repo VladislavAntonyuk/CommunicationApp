@@ -31,10 +31,12 @@ public static class MauiProgram
         var backend = new Uri(builder.Configuration["Backend"]!);
         builder.Services.AddRefitGeneratedClient<IGatewayApi>()
             .ConfigureHttpClient(client => client.BaseAddress = backend);
+        builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"));
+        builder.Services.AddMessageListener();
         builder.Services.AddSingleton(Preferences.Default);
         builder.Services.AddSingleton<ISmsSender, AndroidSmsSender>();
         builder.Services.AddSingleton<ForwardingStatus>();
-        builder.Services.AddSingleton<MessageForwarder>();
+        builder.Services.AddSingleton<IMessageHandler, MessageForwarder>();
         builder.Services.AddSingleton<ISmsPermissions, AndroidSmsPermissions>();
         builder.Services.AddSingleton<IForwardingControl, ForwardingServiceControl>();
         builder.Services.AddSingleton<INotifier, ToastNotifier>();

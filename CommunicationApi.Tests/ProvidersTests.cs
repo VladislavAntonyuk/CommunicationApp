@@ -6,18 +6,12 @@ using Shared;
 
 namespace CommunicationApi.Tests;
 
-public sealed class ProvidersTests : IDisposable
+public sealed class ProvidersTests : ApiTest
 {
-    private readonly ApiFactory _factory = new();
-
-    public void Dispose() => _factory.Dispose();
-
     [Fact]
     public async Task Get_NothingSaved_ReturnsReceivingProvidersEnabled()
     {
-        var client = _factory.CreateClient();
-
-        var providers = await Get(client);
+        var providers = await Get(Client);
 
         Assert.Equal(new[] { Target.Telegram, Target.Slack }, providers.Select(x => x.Target).ToArray());
         Assert.All(providers, x => Assert.True(x.Enabled));
@@ -26,9 +20,7 @@ public sealed class ProvidersTests : IDisposable
     [Fact]
     public async Task Get_ReturnsTargetAsName()
     {
-        var client = _factory.CreateClient();
-
-        var json = await client.GetStringAsync("/providers", TestContext.Current.CancellationToken);
+        var json = await Client.GetStringAsync("/providers", TestContext.Current.CancellationToken);
 
         Assert.Contains("\"target\":\"Telegram\"", json);
     }
@@ -36,11 +28,9 @@ public sealed class ProvidersTests : IDisposable
     [Fact]
     public async Task Put_SwitchOff_OnlyThatProviderIsDisabled()
     {
-        var client = _factory.CreateClient();
+        await Put("Telegram", false);
 
-        await Put(client, "Telegram", false);
-
-        var providers = await Get(client);
+        var providers = await Get(Client);
         Assert.False(providers.Single(x => x.Target == Target.Telegram).Enabled);
         Assert.True(providers.Single(x => x.Target == Target.Slack).Enabled);
     }
@@ -48,23 +38,21 @@ public sealed class ProvidersTests : IDisposable
     [Fact]
     public async Task Put_SwitchOffThenOn_ProviderIsEnabled()
     {
-        var client = _factory.CreateClient();
-        await Put(client, "Slack", false);
+        await Put("Slack", false);
 
-        await Put(client, "Slack", true);
+        await Put("Slack", true);
 
-        Assert.True((await Get(client)).Single(x => x.Target == Target.Slack).Enabled);
+        Assert.True((await Get(Client)).Single(x => x.Target == Target.Slack).Enabled);
     }
 
     [Fact]
     public async Task Put_SameValueTwice_Succeeds()
     {
-        var client = _factory.CreateClient();
-        await Put(client, "Slack", false);
+        await Put("Slack", false);
 
-        await Put(client, "Slack", false);
+        await Put("Slack", false);
 
-        Assert.False((await Get(client)).Single(x => x.Target == Target.Slack).Enabled);
+        Assert.False((await Get(Client)).Single(x => x.Target == Target.Slack).Enabled);
     }
 
     [Theory]
@@ -73,9 +61,7 @@ public sealed class ProvidersTests : IDisposable
     [InlineData("99", "99 does not receive messages")]
     public async Task Put_ProviderWithoutListener_ReturnsBadRequest(string target, string expectedDetail)
     {
-        var client = _factory.CreateClient();
-
-        var response = await client.PutAsJsonAsync($"/providers/{target}", new ProviderSwitch(false), TestContext.Current.CancellationToken);
+        var response = await Client.PutAsJsonAsync($"/providers/{target}", new ProviderSwitch(false), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
@@ -85,9 +71,7 @@ public sealed class ProvidersTests : IDisposable
     [Fact]
     public async Task Put_UnknownTarget_ReturnsBadRequest()
     {
-        var client = _factory.CreateClient();
-
-        var response = await client.PutAsJsonAsync("/providers/Viber", new ProviderSwitch(false), TestContext.Current.CancellationToken);
+        var response = await Client.PutAsJsonAsync("/providers/Viber", new ProviderSwitch(false), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -99,7 +83,7 @@ public sealed class ProvidersTests : IDisposable
     [InlineData("12345", "", false)]
     public async Task Get_TelegramConfigured_DependsOnSettings(string appId, string appHash, bool expected)
     {
-        var client = _factory.WithWebHostBuilder(builder =>
+        var client = Factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Telegram:AppId", appId);
             builder.UseSetting("Telegram:AppHash", appHash);
@@ -116,7 +100,7 @@ public sealed class ProvidersTests : IDisposable
     [InlineData("", false)]
     public async Task Get_SlackConfigured_DependsOnSettings(string appLevelToken, bool expected)
     {
-        var client = _factory.WithWebHostBuilder(builder =>
+        var client = Factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Slack:ApiToken", "token");
             builder.UseSetting("Slack:AppLevelToken", appLevelToken);
@@ -128,60 +112,41 @@ public sealed class ProvidersTests : IDisposable
     }
 
     [Fact]
-    public async Task Notify_ProviderSwitchedOff_MessageIsNotStored()
+    public async Task Notify_ProviderSwitchedOff_MessageIsNotPublished()
     {
-        var client = _factory.CreateClient();
-        await Put(client, "Telegram", false);
+        await Put("Telegram", false);
 
-        await Notify(client, "Telegram", "Telegram|1|hello");
+        await Notify("Telegram", "Telegram|1|hello");
 
-        Assert.Empty(await Receive(client));
+        Assert.Empty(Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_OtherProviderSwitchedOff_MessageIsStored()
+    public async Task Notify_OtherProviderSwitchedOff_MessageIsPublished()
     {
-        var client = _factory.CreateClient();
-        await Put(client, "Telegram", false);
+        await Put("Telegram", false);
 
-        await Notify(client, "Slack", "Slack|U1|hello");
+        await Notify("Slack", "Slack|U1|hello");
 
-        Assert.Equal(new[] { "Slack|U1|hello" }, (await Receive(client)).Select(x => x.Text).ToArray());
+        Assert.Equal(new[] { "Slack|U1|hello" }, Factory.Publisher.Published);
     }
 
     [Fact]
-    public async Task Notify_ProviderSwitchedBackOn_NewMessagesAreStored()
+    public async Task Notify_ProviderSwitchedBackOn_NewMessagesArePublished()
     {
-        var client = _factory.CreateClient();
-        await Put(client, "Telegram", false);
-        await Notify(client, "Telegram", "Telegram|1|while off");
-        await Put(client, "Telegram", true);
+        await Put("Telegram", false);
+        await Notify("Telegram", "Telegram|1|while off");
+        await Put("Telegram", true);
 
-        await Notify(client, "Telegram", "Telegram|1|after on");
+        await Notify("Telegram", "Telegram|1|after on");
 
-        Assert.Equal(new[] { "Telegram|1|after on" }, (await Receive(client)).Select(x => x.Text).ToArray());
+        Assert.Equal(new[] { "Telegram|1|after on" }, Factory.Publisher.Published);
     }
 
-    [Fact]
-    public async Task SwitchOff_MessagesAlreadyStoredAreStillReturned()
+    private async Task Notify(string target, string text)
     {
-        var client = _factory.CreateClient();
-        await Notify(client, "Telegram", "Telegram|1|before off");
-
-        await Put(client, "Telegram", false);
-
-        Assert.Equal(new[] { "Telegram|1|before off" }, (await Receive(client)).Select(x => x.Text).ToArray());
-    }
-
-    private static async Task Notify(HttpClient client, string target, string text)
-    {
-        var response = await client.PostAsJsonAsync($"/notify/{target}", new Message(text), TestContext.Current.CancellationToken);
+        var response = await Client.PostAsJsonAsync($"/notify/{target}", new Message(text), TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-    }
-
-    private static async Task<List<ReceivedMessage>> Receive(HttpClient client)
-    {
-        return await client.GetFromJsonAsync<List<ReceivedMessage>>("/receive", TestContext.Current.CancellationToken) ?? [];
     }
 
     private static async Task<List<ProviderStatus>> Get(HttpClient client)
@@ -189,9 +154,9 @@ public sealed class ProvidersTests : IDisposable
         return await client.GetFromJsonAsync<List<ProviderStatus>>("/providers", TestContext.Current.CancellationToken) ?? [];
     }
 
-    private static async Task Put(HttpClient client, string target, bool enabled)
+    private async Task Put(string target, bool enabled)
     {
-        var response = await client.PutAsJsonAsync($"/providers/{target}", new ProviderSwitch(enabled), TestContext.Current.CancellationToken);
+        var response = await Client.PutAsJsonAsync($"/providers/{target}", new ProviderSwitch(enabled), TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
     }
 }

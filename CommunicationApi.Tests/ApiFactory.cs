@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Silverback.Messaging.Publishing;
 
 namespace CommunicationApi.Tests;
 
@@ -23,21 +24,21 @@ public class ApiFactory : WebApplicationFactory<Program>
 
     public FakeTelegramLogin TelegramLogin { get; } = new();
 
+    public FakeMessagePublisher Publisher { get; } = new();
+
+    protected virtual void ConfigureMessaging(IServiceCollection services)
+    {
+        services.RemoveAll<IHostedService>();
+        services.AddSingleton<IPublisher>(Publisher);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _connection.Open();
 
         builder.ConfigureTestServices(services =>
         {
-            var listeners = services
-                .Where(x => x.ServiceType == typeof(IHostedService)
-                            && (x.ImplementationType == typeof(TelegramBackgroundService)
-                                || x.ImplementationType == typeof(SlackBackgroundService)))
-                .ToList();
-            foreach (var listener in listeners)
-            {
-                services.Remove(listener);
-            }
+            ConfigureMessaging(services);
 
             services.RemoveAll<IDbContextOptionsConfiguration<CommunicationApiDbContext>>();
             services.RemoveAll<DbContextOptions<CommunicationApiDbContext>>();

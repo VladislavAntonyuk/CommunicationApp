@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using Shared;
 using Silverback.Configuration;
 using Silverback.Messaging.Configuration;
-using Silverback.Messaging.Messages;
 using Silverback.Messaging.Publishing;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -117,7 +116,7 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPub
             return;
     }
 
-    await publisher.PublishAsync(new StringMessage(request.Text));
+    await publisher.PublishAsync(new OutgoingSms(request.Text, Guid.NewGuid().ToString("N")));
 }).WithDescription("Service sends webhooks on this endpoint.");
 
 app.MapGet("/providers",

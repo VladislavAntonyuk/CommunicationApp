@@ -1,8 +1,10 @@
+using System.Text.Json;
 using CommunicationApp.Services;
 using Microsoft.Extensions.DependencyInjection;
 using MQTTnet;
 using MQTTnet.Formatter;
 using MQTTnet.Protocol;
+using Shared;
 
 namespace CommunicationApi.Tests;
 
@@ -138,7 +140,7 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         {
             await client.PublishAsync(new MqttApplicationMessageBuilder()
                 .WithTopic(_topic)
-                .WithPayload(text)
+                .WithPayload(JsonSerializer.Serialize(new OutgoingSms(text)))
                 .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
                 .Build(), Token);
         }

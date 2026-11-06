@@ -27,7 +27,9 @@ builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builde
 builder.Services.AddSilverback()
     .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
     .AddBrokerClientsConfigurator<BrokerClientsConfigurator>()
-    .AddScopedSubscriber<SmsAckSubscriber>();
+    .AddScopedSubscriber<SmsAckSubscriber>()
+    .AddScopedSubscriber<IncomingSmsSubscriber>()
+    .AddScopedErrorPolicyCallback<IncomingSmsSkipRecorder>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<ISlackService, SlackService>();

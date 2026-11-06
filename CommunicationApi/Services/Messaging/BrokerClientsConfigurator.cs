@@ -6,6 +6,8 @@ namespace CommunicationApi.Services.Messaging;
 
 public class BrokerClientsConfigurator(IConfiguration configuration, IOptions<MqttSettings> options) : IBrokerClientsConfigurator
 {
+    public const int MaxRetries = 3;
+
     public void Configure(BrokerClientsConfigurationBuilder builder)
     {
         var broker = new Uri(configuration.GetConnectionString("MessageBroker")!);
@@ -24,6 +26,12 @@ public class BrokerClientsConfigurator(IConfiguration configuration, IOptions<Mq
                 .Consume<SmsAck>(endpoint => endpoint
                     .ConsumeFrom(options.Value.AckTopic)
                     .WithAtLeastOnceQoS()
-                    .OnError(policy => policy.Retry(2).ThenSkip()))));
+                    .OnError(policy => policy.Retry(2).ThenSkip()))
+                .Consume<IncomingSms>(endpoint => endpoint
+                    .ConsumeFrom(options.Value.IncomingTopic)
+                    .WithAtLeastOnceQoS()
+                    .OnError(policy => policy
+                        .Retry(MaxRetries, retry => retry.WithExponentialDelay(options.Value.RetryDelay, 2))
+                        .ThenSkip()))));
     }
 }

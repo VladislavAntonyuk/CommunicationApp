@@ -33,6 +33,25 @@ namespace CommunicationApi.Database.Migrations
                     b.ToTable("ChatSettings");
                 });
 
+            modelBuilder.Entity("CommunicationApi.Database.IncomingMessage", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Sent")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("IncomingMessages");
+                });
+
             modelBuilder.Entity("CommunicationApi.Database.OutgoingMessage", b =>
                 {
                     b.Property<string>("Id")

@@ -22,6 +22,8 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
     private string AckTopic => $"{_topic}/ack";
 
+    private string IncomingTopic => $"{_topic}/incoming";
+
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -173,6 +175,61 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         Assert.Equal("Not connected to the broker", reason);
     }
 
+    [Fact]
+    public async Task Forward_PublishesIncomingSmsWithId()
+    {
+        using var subscriber = await Connect(mosquitto.Broker);
+        var received = new TaskCompletionSource<MqttApplicationMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        subscriber.ApplicationMessageReceivedAsync += e =>
+        {
+            received.TrySetResult(e.ApplicationMessage);
+            return Task.CompletedTask;
+        };
+        await Subscribe(subscriber, IncomingTopic);
+        var handler = new Recorder(0);
+        await using var services = NewServices(mosquitto.Broker, handler);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var running = services.GetRequiredService<MessageListener>().Run(stop.Token);
+        await handler.IsConnected.WaitAsync(Timeout, Token);
+
+        await services.GetRequiredService<IncomingSmsForwarder>().Forward("Telegram|1|hello", "id1", Token);
+        var message = await received.Task.WaitAsync(Timeout, Token);
+        await stop.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
+
+        Assert.Equal("id1", Encoding.UTF8.GetString(message.CorrelationData));
+        Assert.Equal("Telegram|1|hello", JsonSerializer.Deserialize<IncomingSms>(message.ConvertPayloadToString())!.Text);
+    }
+
+    [Fact]
+    public async Task Forward_BeforeConnecting_FailsAndWorksAfterConnecting()
+    {
+        using var subscriber = await Connect(mosquitto.Broker);
+        var received = new TaskCompletionSource<MqttApplicationMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        subscriber.ApplicationMessageReceivedAsync += e =>
+        {
+            received.TrySetResult(e.ApplicationMessage);
+            return Task.CompletedTask;
+        };
+        await Subscribe(subscriber, IncomingTopic);
+        var handler = new Recorder(0);
+        await using var services = NewServices(mosquitto.Broker, handler);
+        var forwarder = services.GetRequiredService<IncomingSmsForwarder>();
+        using var early = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+
+        await Assert.ThrowsAnyAsync<Exception>(() => forwarder.Forward("Telegram|1|early", "id1", early.Token));
+
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var running = services.GetRequiredService<MessageListener>().Run(stop.Token);
+        await handler.IsConnected.WaitAsync(Timeout, Token);
+        await forwarder.Forward("Telegram|1|later", "id2", Token);
+        var message = await received.Task.WaitAsync(Timeout, Token);
+        await stop.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
+
+        Assert.Equal("id2", Encoding.UTF8.GetString(message.CorrelationData));
+    }
+
     private ServiceProvider NewServices(Uri broker, IMessageHandler handler, Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection()
@@ -182,6 +239,7 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
                 settings.Broker = broker;
                 settings.ClientId = _clientId;
                 settings.Topic = _topic;
+                settings.IncomingTopic = IncomingTopic;
                 settings.RetryDelay = TimeSpan.FromMilliseconds(10);
             })
             .AddSingleton(handler)

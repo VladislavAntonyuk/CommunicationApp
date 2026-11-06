@@ -38,8 +38,11 @@ public sealed class FakeSenders : IEmailService, ITelegramService, ITeamsService
 
     Task ISlackService.Send(string recipient, string text) => Record(new SentMessage(Target.Slack, recipient, null, text));
 
+    public int Attempts { get; private set; }
+
     private Task Record(SentMessage message)
     {
+        Attempts++;
         if (Exception != null)
             throw Exception;
 

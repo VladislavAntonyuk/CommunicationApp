@@ -37,5 +37,6 @@ public sealed class BrokerTests(MosquittoFixture mosquitto) : IClassFixture<Mosq
         var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
         Assert.Equal("Teams|1|hello", JsonSerializer.Deserialize<OutgoingSms>(message.ConvertPayloadToString())!.Text);
         Assert.Matches("^[0-9a-f]{32}$", Encoding.UTF8.GetString(message.CorrelationData));
+        Assert.Equal("messages/ack", message.ResponseTopic);
     }
 }

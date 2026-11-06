@@ -16,6 +16,7 @@ public class BrokerClientsConfigurator(IConfiguration configuration, IOptions<Mq
                 .WithClientId(options.Value.ClientId)
                 .Produce<OutgoingSms>(endpoint => endpoint
                     .ProduceTo(options.Value.Topic)
+                    .SetResponseTopic(options.Value.AckTopic)
                     .SetCorrelationData(sms => sms?.Id)
                     .WithAtLeastOnceQoS())));
     }

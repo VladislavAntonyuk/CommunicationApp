@@ -10,9 +10,8 @@ public sealed class MessageForwarder(ISmsSender smsSender, ForwardingStatus stat
         }
         catch (Exception ex)
         {
-            var reason = $"Could not send SMS: {ex.Message}";
-            status.Failed(0, reason);
-            throw new InvalidOperationException(reason, ex);
+            status.Failed(0, $"Could not send SMS: {ex.Message}");
+            throw;
         }
 
         status.Succeeded(1);

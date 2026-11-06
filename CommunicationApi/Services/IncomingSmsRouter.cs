@@ -45,20 +45,20 @@ public sealed class IncomingSmsRouter(
     private static (Target Target, string[] Parts) Parse(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
-            throw new InvalidSmsException("Text is required");
+            throw new PermanentSendException("Text is required");
 
         var targetName = text.Split('|', 2)[0].Trim();
         if (!Enum.GetNames<Target>().Contains(targetName, StringComparer.OrdinalIgnoreCase))
-            throw new InvalidSmsException($"Unknown target '{targetName}'");
+            throw new PermanentSendException($"Unknown target '{targetName}'");
 
         var target = Enum.Parse<Target>(targetName, true);
         var fieldCount = target == Target.Email ? 4 : 3;
         var parts = text.Split('|', fieldCount);
         if (parts.Length < fieldCount)
-            throw new InvalidSmsException(target == Target.Email ? "Expected Email|to|subject|text" : $"Expected {target}|recipient|text");
+            throw new PermanentSendException(target == Target.Email ? "Expected Email|to|subject|text" : $"Expected {target}|recipient|text");
 
         if (target == Target.Telegram && !long.TryParse(parts[1], out _))
-            throw new InvalidSmsException("Telegram recipient must be a numeric chat id");
+            throw new PermanentSendException("Telegram recipient must be a numeric chat id");
 
         return (target, parts);
     }

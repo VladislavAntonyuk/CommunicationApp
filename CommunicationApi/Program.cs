@@ -53,24 +53,6 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/send", async (IncomingSmsRouter router, ILogger<Program> logger, Shared.Message message) =>
-{
-    try
-    {
-        await router.Send(message.Text);
-        return Results.Ok();
-    }
-    catch (InvalidSmsException ex)
-    {
-        return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Failed to send message");
-        return Results.Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway);
-    }
-}).WithDescription("Android client sends request to this endpoint.");
-
 app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, Target target, Shared.Message request) =>
 {
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))

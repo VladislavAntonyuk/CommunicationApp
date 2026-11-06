@@ -6,6 +6,9 @@ using MQTTnet;
 using MQTTnet.Formatter;
 using MQTTnet.Protocol;
 using Shared;
+using Silverback.Configuration;
+using Silverback.Messaging.Consuming.ErrorHandling;
+using Silverback.Messaging.Messages;
 
 namespace CommunicationApi.Tests;
 
@@ -134,6 +137,27 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
     }
 
     [Fact]
+    public async Task ErrorHandlingFails_ReconnectsAndContinues()
+    {
+        await RegisterSession();
+        await using var acks = await AckListener.Start(mosquitto.Broker, AckTopic, 2);
+        await PublishRequest("bad", "id1");
+        await PublishRequest("good", "id2");
+        var handled = new Recorder(1, text =>
+        {
+            if (text == "bad")
+                throw new InvalidOperationException("No signal");
+        });
+
+        await RunUntil(handled, until: acks.Done, configure: services => services
+            .AddSilverback()
+            .AddSingletonErrorPolicyCallback(new FailingOnce()));
+
+        Assert.Equal(new[] { "good" }, handled.Texts);
+        Assert.Equal([("id1", new SmsAck(false, "No signal")), ("id2", new SmsAck(true))], acks.Acks);
+    }
+
+    [Fact]
     public async Task BrokerUnreachable_ReportsFailure()
     {
         var handler = new Recorder(0);
@@ -148,18 +172,22 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         Assert.Equal("Not connected to the broker", reason);
     }
 
-    private ServiceProvider NewServices(Uri broker, IMessageHandler handler) => new ServiceCollection()
-        .AddLogging()
-        .Configure<MqttSettings>(settings =>
-        {
-            settings.Broker = broker;
-            settings.ClientId = _clientId;
-            settings.Topic = _topic;
-            settings.RetryDelay = TimeSpan.FromMilliseconds(10);
-        })
-        .AddSingleton(handler)
-        .AddMessageListener()
-        .BuildServiceProvider();
+    private ServiceProvider NewServices(Uri broker, IMessageHandler handler, Action<IServiceCollection>? configure = null)
+    {
+        var services = new ServiceCollection()
+            .AddLogging()
+            .Configure<MqttSettings>(settings =>
+            {
+                settings.Broker = broker;
+                settings.ClientId = _clientId;
+                settings.Topic = _topic;
+                settings.RetryDelay = TimeSpan.FromMilliseconds(10);
+            })
+            .AddSingleton(handler)
+            .AddMessageListener();
+        configure?.Invoke(services);
+        return services.BuildServiceProvider();
+    }
 
     private async Task RegisterSession()
     {
@@ -177,9 +205,13 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         await client.DisconnectAsync(cancellationToken: Token);
     }
 
-    private async Task RunUntil(Recorder handled, TimeSpan? settle = null, Task? until = null)
+    private async Task RunUntil(
+        Recorder handled,
+        TimeSpan? settle = null,
+        Task? until = null,
+        Action<IServiceCollection>? configure = null)
     {
-        await using var services = NewServices(mosquitto.Broker, handled);
+        await using var services = NewServices(mosquitto.Broker, handled, configure);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
 
         var running = services.GetRequiredService<MessageListener>().Run(stop.Token);
@@ -275,6 +307,16 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FailingOnce : ISkipMessageErrorPolicyCallback
+    {
+        private int _calls;
+
+        public Task OnSkippingMessageAsync(IRawInboundEnvelope envelope, Exception exception) =>
+            Interlocked.Increment(ref _calls) == 1
+                ? throw new InvalidOperationException("Callback failed")
+                : Task.CompletedTask;
     }
 
     private sealed class Recorder(int expected, Action<string>? check = null) : IMessageHandler

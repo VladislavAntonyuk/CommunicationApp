@@ -43,6 +43,8 @@ public sealed class MessageListener(
             {
                 if (consumers.Any(consumer => consumer.StatusInfo.Status < ConsumerStatus.Connected))
                     handler.Failed("Not connected to the broker");
+
+                await connector.ConnectAsync(token);
             }
         }
         finally

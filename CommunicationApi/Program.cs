@@ -26,7 +26,8 @@ builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
 builder.Services.AddSilverback()
     .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
-    .AddBrokerClientsConfigurator<BrokerClientsConfigurator>();
+    .AddBrokerClientsConfigurator<BrokerClientsConfigurator>()
+    .AddScopedSubscriber<SmsAckSubscriber>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<ISlackService, SlackService>();
@@ -116,7 +117,11 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPub
             return;
     }
 
-    await publisher.PublishAsync(new OutgoingSms(request.Text, Guid.NewGuid().ToString("N")));
+    var id = Guid.NewGuid().ToString("N");
+    dbContext.OutgoingMessages.Add(new OutgoingMessage { Id = id, CreatedAt = DateTime.UtcNow });
+    await dbContext.SaveChangesAsync();
+
+    await publisher.PublishAsync(new OutgoingSms(request.Text, id));
 }).WithDescription("Service sends webhooks on this endpoint.");
 
 app.MapGet("/providers",

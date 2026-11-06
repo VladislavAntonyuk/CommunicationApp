@@ -14,10 +14,16 @@ public class BrokerClientsConfigurator(IConfiguration configuration, IOptions<Mq
             .ConnectViaTcp(broker.Host, broker.Port)
             .AddClient(client => client
                 .WithClientId(options.Value.ClientId)
+                .RequestPersistentSession(options.Value.SessionExpiry)
                 .Produce<OutgoingSms>(endpoint => endpoint
                     .ProduceTo(options.Value.Topic)
                     .SetResponseTopic(options.Value.AckTopic)
                     .SetCorrelationData(sms => sms?.Id)
-                    .WithAtLeastOnceQoS())));
+                    .WithMessageExpiration(options.Value.MessageTtl)
+                    .WithAtLeastOnceQoS())
+                .Consume<SmsAck>(endpoint => endpoint
+                    .ConsumeFrom(options.Value.AckTopic)
+                    .WithAtLeastOnceQoS()
+                    .OnError(policy => policy.Retry(2).ThenSkip()))));
     }
 }

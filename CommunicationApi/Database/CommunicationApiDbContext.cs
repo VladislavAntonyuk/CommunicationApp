@@ -6,4 +6,5 @@ public class CommunicationApiDbContext(DbContextOptions<CommunicationApiDbContex
 {
     public DbSet<ProviderSetting> ProviderSettings => Set<ProviderSetting>();
     public DbSet<ChatSetting> ChatSettings => Set<ChatSetting>();
+    public DbSet<OutgoingMessage> OutgoingMessages => Set<OutgoingMessage>();
 }

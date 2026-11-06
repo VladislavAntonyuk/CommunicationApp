@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 using Silverback.Messaging.Configuration;
-using Silverback.Messaging.Messages;
+using Shared;
 
 namespace CommunicationApi.Services.Messaging;
 
@@ -14,9 +14,16 @@ public class BrokerClientsConfigurator(IConfiguration configuration, IOptions<Mq
             .ConnectViaTcp(broker.Host, broker.Port)
             .AddClient(client => client
                 .WithClientId(options.Value.ClientId)
-                .Produce<StringMessage>(endpoint => endpoint
+                .RequestPersistentSession(options.Value.SessionExpiry)
+                .Produce<OutgoingSms>(endpoint => endpoint
                     .ProduceTo(options.Value.Topic)
-                    .ProduceStrings()
-                    .WithAtLeastOnceQoS())));
+                    .SetResponseTopic(options.Value.AckTopic)
+                    .SetCorrelationData(sms => sms?.Id)
+                    .WithMessageExpiration(options.Value.MessageTtl)
+                    .WithAtLeastOnceQoS())
+                .Consume<SmsAck>(endpoint => endpoint
+                    .ConsumeFrom(options.Value.AckTopic)
+                    .WithAtLeastOnceQoS()
+                    .OnError(policy => policy.Retry(2).ThenSkip()))));
     }
 }

@@ -27,11 +27,7 @@ public sealed class AndroidSmsSender : ISmsSender
                 .Select((_, i) => PendingIntent.GetBroadcast(context, i, new Intent(action).SetPackage(context.PackageName), PendingIntentFlags.Immutable)!)
                 .ToList();
 
-            if (parts.Count == 1)
-                smsManager.SendTextMessage(phoneNumber, null, text, sentIntents[0], null);
-            else
-                smsManager.SendMultipartTextMessage(phoneNumber, null, parts, sentIntents, null);
-
+            smsManager.SendMultipartTextMessage(phoneNumber, null, parts, sentIntents, null);
             await receiver.Sent.WaitAsync(ResultTimeout);
         }
         finally

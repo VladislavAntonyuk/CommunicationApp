@@ -25,16 +25,8 @@ public sealed class MessageListener(
 
     private readonly ConcurrentDictionary<string, DateTime> _handled = new();
 
-    private bool _initialized;
-
     public async Task Run(CancellationToken token)
     {
-        if (!_initialized)
-        {
-            await connector.InitializeAsync();
-            _initialized = true;
-        }
-
         await connector.ConnectAsync(token);
         try
         {

@@ -8,6 +8,8 @@ public class MqttSettings
 
     public required string Topic { get; set; }
 
+    public required string IncomingTopic { get; set; }
+
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(5);
 
     public TimeSpan SessionExpiry { get; set; } = TimeSpan.FromDays(7);

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using CommunicationApp.Services;
@@ -191,17 +192,11 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
     private async Task RegisterSession()
     {
-        using var client = new MqttClientFactory().CreateMqttClient();
-        await client.ConnectAsync(new MqttClientOptionsBuilder()
-            .WithConnectionUri(mosquitto.Broker)
+        using var client = await Connect(mosquitto.Broker, options => options
             .WithClientId(_clientId)
-            .WithProtocolVersion(MqttProtocolVersion.V500)
             .WithCleanStart(false)
-            .WithSessionExpiryInterval(60)
-            .Build(), Token);
-        await client.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
-            .WithTopicFilter(f => f.WithTopic(_topic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
-            .Build(), Token);
+            .WithSessionExpiryInterval(60));
+        await Subscribe(client, _topic);
         await client.DisconnectAsync(cancellationToken: Token);
     }
 
@@ -226,65 +221,58 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
     private async Task Publish(params string[] texts)
     {
-        using var client = new MqttClientFactory().CreateMqttClient();
-        await client.ConnectAsync(new MqttClientOptionsBuilder().WithConnectionUri(mosquitto.Broker).Build(), Token);
+        using var client = await Connect(mosquitto.Broker);
         foreach (var text in texts)
-        {
-            await client.PublishAsync(new MqttApplicationMessageBuilder()
-                .WithTopic(_topic)
-                .WithPayload(JsonSerializer.Serialize(new OutgoingSms(text)))
-                .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
-                .Build(), Token);
-        }
-
+            await client.PublishAsync(Sms(text).Build(), Token);
         await client.DisconnectAsync(cancellationToken: Token);
     }
 
     private async Task PublishRequest(string text, string id)
     {
-        using var client = new MqttClientFactory().CreateMqttClient();
-        await client.ConnectAsync(new MqttClientOptionsBuilder()
-            .WithConnectionUri(mosquitto.Broker)
-            .WithProtocolVersion(MqttProtocolVersion.V500)
-            .Build(), Token);
-        await client.PublishAsync(new MqttApplicationMessageBuilder()
-            .WithTopic(_topic)
-            .WithPayload(JsonSerializer.Serialize(new OutgoingSms(text)))
+        using var client = await Connect(mosquitto.Broker);
+        await client.PublishAsync(Sms(text)
             .WithResponseTopic(AckTopic)
             .WithCorrelationData(Encoding.UTF8.GetBytes(id))
-            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
             .Build(), Token);
         await client.DisconnectAsync(cancellationToken: Token);
     }
 
+    private MqttApplicationMessageBuilder Sms(string text) => new MqttApplicationMessageBuilder()
+        .WithTopic(_topic)
+        .WithPayload(JsonSerializer.Serialize(new OutgoingSms(text)))
+        .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce);
+
+    private static async Task<IMqttClient> Connect(Uri broker, Action<MqttClientOptionsBuilder>? configure = null)
+    {
+        var options = new MqttClientOptionsBuilder()
+            .WithConnectionUri(broker)
+            .WithProtocolVersion(MqttProtocolVersion.V500);
+        configure?.Invoke(options);
+        var client = new MqttClientFactory().CreateMqttClient();
+        await client.ConnectAsync(options.Build(), Token);
+        return client;
+    }
+
+    private static Task Subscribe(IMqttClient client, string topic) =>
+        client.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
+            .WithTopicFilter(f => f.WithTopic(topic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
+            .Build(), Token);
+
     private sealed class AckListener(IMqttClient client, int expected) : IAsyncDisposable
     {
         private readonly TaskCompletionSource _done = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly List<(string, SmsAck)> _acks = [];
+        private readonly ConcurrentQueue<(string, SmsAck)> _acks = new();
 
-        public IReadOnlyList<(string, SmsAck)> Acks
-        {
-            get
-            {
-                lock (_acks)
-                    return [.. _acks];
-            }
-        }
+        public IReadOnlyList<(string, SmsAck)> Acks => [.. _acks];
 
         public Task Done => _done.Task;
 
         public static async Task<AckListener> Start(Uri broker, string topic, int expected)
         {
-            var client = new MqttClientFactory().CreateMqttClient();
+            var client = await Connect(broker);
             var listener = new AckListener(client, expected);
             client.ApplicationMessageReceivedAsync += listener.OnReceived;
-            await client.ConnectAsync(new MqttClientOptionsBuilder()
-                .WithConnectionUri(broker)
-                .WithProtocolVersion(MqttProtocolVersion.V500)
-                .Build(), Token);
-            await client.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
-                .WithTopicFilter(f => f.WithTopic(topic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
-                .Build(), Token);
+            await Subscribe(client, topic);
             return listener;
         }
 
@@ -298,13 +286,9 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         {
             var id = Encoding.UTF8.GetString(e.ApplicationMessage.CorrelationData);
             var ack = JsonSerializer.Deserialize<SmsAck>(e.ApplicationMessage.ConvertPayloadToString())!;
-            lock (_acks)
-            {
-                _acks.Add((id, ack));
-                if (_acks.Count == expected)
-                    _done.TrySetResult();
-            }
-
+            _acks.Enqueue((id, ack));
+            if (_acks.Count == expected)
+                _done.TrySetResult();
             return Task.CompletedTask;
         }
     }

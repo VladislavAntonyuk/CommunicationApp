@@ -51,7 +51,7 @@
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.14" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
-        <PackageReference Include="Silverback.Integration.MQTT" Version="5.7.1" />
+        <PackageReference Include="Silverback.Integration.MQTT" Version="5.8.0" />
         <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.11.2.1" />
         <PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.19.0.1" />
     </ItemGroup>

@@ -104,6 +104,7 @@ public static class MessageListenerServiceCollectionExtensions
     {
         services.TryAddSingleton<IHostApplicationLifetime, ApplicationLifetime>();
         services.AddSingleton<MessageListener>();
+        services.AddSingleton<IncomingSmsForwarder>();
         services.AddSilverback()
             .WithConnectionToMessageBroker(options => options.AddMqtt().ManuallyConnect().RetryOnConnectionFailure(ReconnectDelay))
             .AddBrokerClientsConfigurator<BrokerClientsConfigurator>()

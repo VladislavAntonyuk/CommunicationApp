@@ -27,6 +27,10 @@ public class BrokerClientsConfigurator(IOptions<MqttSettings> options) : IBroker
                         .ThenSkip()))
                 .Produce<SmsAck>(endpoint => endpoint
                     .ProduceToDynamicTopic()
+                    .WithAtLeastOnceQoS())
+                .Produce<IncomingSms>(endpoint => endpoint
+                    .ProduceTo(settings.IncomingTopic)
+                    .SetCorrelationData(sms => sms?.Id)
                     .WithAtLeastOnceQoS())));
     }
 }

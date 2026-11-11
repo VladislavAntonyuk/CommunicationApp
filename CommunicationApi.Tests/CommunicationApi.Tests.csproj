@@ -27,6 +27,7 @@
     <Compile Include="..\CommunicationApp\Services\SkippedSmsReplier.cs" Link="Gateway\SkippedSmsReplier.cs" />
     <Compile Include="..\CommunicationApp\Services\IncomingSmsForwarder.cs" Link="Gateway\IncomingSmsForwarder.cs" />
     <None Include="..\CommunicationApp.AppHost\mosquitto\mosquitto.conf" Link="mosquitto.conf" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="mosquitto.passwd" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

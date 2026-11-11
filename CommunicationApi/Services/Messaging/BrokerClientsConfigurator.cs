@@ -10,10 +10,8 @@ public class BrokerClientsConfigurator(IConfiguration configuration, IOptions<Mq
 
     public void Configure(BrokerClientsConfigurationBuilder builder)
     {
-        var broker = new Uri(configuration.GetConnectionString("MessageBroker")!);
-
         builder.AddMqttClients(clients => clients
-            .ConnectViaTcp(broker.Host, broker.Port)
+            .ConnectTo(configuration.GetConnectionString("MessageBroker")!)
             .AddClient(client => client
                 .WithClientId(options.Value.ClientId)
                 .RequestPersistentSession(options.Value.SessionExpiry)

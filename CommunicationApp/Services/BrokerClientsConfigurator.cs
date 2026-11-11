@@ -14,7 +14,7 @@ public class BrokerClientsConfigurator(IOptions<MqttSettings> options) : IBroker
         var settings = options.Value;
 
         builder.AddMqttClients(clients => clients
-            .ConnectViaTcp(settings.Broker.Host, settings.Broker.Port)
+            .ConnectTo(settings.Broker)
             .AddClient(client => client
                 .WithClientId(settings.ClientId)
                 .UseProtocolVersion(MqttProtocolVersion.V500)

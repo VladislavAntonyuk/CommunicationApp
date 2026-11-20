@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using CommunicationApi.Database;
 using CommunicationApi.Services;
 using CommunicationApi.Services.Auth;
@@ -99,19 +98,25 @@ app.MapPost("/auth/code", async (LoginCodeService codes, HttpResponse response, 
 app.MapPost("/auth/login", async (LoginCodeService codes, LoginRequest request) =>
         await codes.CheckCode(request.PhoneNumber, request.Code) switch
         {
-            CheckCodeResult.Valid valid => Results.SignIn(
-                new ClaimsPrincipal(new ClaimsIdentity(
-                    [
-                        new Claim(ClaimTypes.NameIdentifier, valid.User.Id.ToString()),
-                        new Claim(ClaimTypes.MobilePhone, valid.User.PhoneNumber)
-                    ],
-                    BearerTokenDefaults.AuthenticationScheme)),
-                authenticationScheme: BearerTokenDefaults.AuthenticationScheme),
+            CheckCodeResult.Valid valid => Results.SignIn(UserPrincipal.Create(valid.User), authenticationScheme: BearerTokenDefaults.AuthenticationScheme),
             CheckCodeResult.TooManyAttempts => Results.Problem("Too many wrong codes, try again later", statusCode: StatusCodes.Status429TooManyRequests),
             CheckCodeResult.Invalid invalid => Results.Problem(invalid.Reason, statusCode: StatusCodes.Status400BadRequest),
             _ => throw new InvalidOperationException()
         })
     .WithDescription("Checks the login code and returns access and refresh tokens.");
+
+app.MapPost("/auth/refresh", async (IOptionsMonitor<BearerTokenOptions> bearerOptions, CommunicationApiDbContext dbContext, RefreshRequest request) =>
+    {
+        var ticket = bearerOptions.Get(BearerTokenDefaults.AuthenticationScheme).RefreshTokenProtector.Unprotect(request.RefreshToken);
+        if (ticket?.Properties.ExpiresUtc is not { } expiresUtc || DateTimeOffset.UtcNow >= expiresUtc || UserPrincipal.UserId(ticket.Principal) is not { } userId)
+            return Results.Challenge();
+
+        var user = await dbContext.Users.FindAsync(userId);
+        return user == null
+            ? Results.Challenge()
+            : Results.SignIn(UserPrincipal.Create(user), authenticationScheme: BearerTokenDefaults.AuthenticationScheme);
+    })
+    .WithDescription("Exchanges a refresh token for new access and refresh tokens.");
 
 app.MapGet("/providers",
     async (CommunicationApiDbContext dbContext, IConfiguration configuration) =>

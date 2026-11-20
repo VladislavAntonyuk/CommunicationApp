@@ -119,6 +119,58 @@ public sealed class LoginTests : ApiTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Refresh_ReturnsNewTokens()
+    {
+        var tokens = await LoggedIn();
+
+        var response = await Refresh(tokens.GetProperty("refreshToken").GetString()!);
+
+        response.EnsureSuccessStatusCode();
+        var refreshed = await response.Content.ReadFromJsonAsync<JsonElement>(Token);
+        Assert.NotEmpty(refreshed.GetProperty("accessToken").GetString()!);
+        Assert.NotEmpty(refreshed.GetProperty("refreshToken").GetString()!);
+    }
+
+    [Fact]
+    public async Task Refresh_WithAccessToken_ReturnsUnauthorized()
+    {
+        var tokens = await LoggedIn();
+
+        var response = await Refresh(tokens.GetProperty("accessToken").GetString()!);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_WithGarbage_ReturnsUnauthorized()
+    {
+        var response = await Refresh("not-a-token");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_ForDeletedUser_ReturnsUnauthorized()
+    {
+        var tokens = await LoggedIn();
+        await InDb(db => db.Users.ExecuteDeleteAsync(Token));
+
+        var response = await Refresh(tokens.GetProperty("refreshToken").GetString()!);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    private async Task<JsonElement> LoggedIn()
+    {
+        var response = await Login(PhoneNumber, await RequestCode());
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<JsonElement>(Token);
+    }
+
+    private Task<HttpResponseMessage> Refresh(string refreshToken) =>
+        Client.PostAsJsonAsync("/auth/refresh", new RefreshRequest(refreshToken), Token);
+
     private async Task<string> RequestCode()
     {
         var before = Factory.Publisher.Sms.Count;

@@ -16,6 +16,8 @@ namespace CommunicationApp.Tests.Gateway;
 
 public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFixture<MosquittoFixture>
 {
+    private const string PhoneNumber = "+380501234567";
+
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
     private readonly string _clientId = $"gateway-{Guid.NewGuid():N}";
@@ -37,6 +39,7 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         await RunUntil(handled);
 
         Assert.Equal(new[] { "first", "second", "third" }, handled.Texts);
+        Assert.All(handled.Recipients, to => Assert.Equal(PhoneNumber, to));
     }
 
     [Fact]
@@ -193,13 +196,13 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         var running = services.GetRequiredService<MessageListener>().Run(stop.Token);
         await handler.IsConnected.WaitAsync(Timeout, Token);
 
-        await services.GetRequiredService<IncomingSmsForwarder>().Forward("Telegram|1|hello", "id1", Token);
+        await services.GetRequiredService<IncomingSmsForwarder>().Forward(PhoneNumber, "Telegram|1|hello", "id1", Token);
         var message = await received.Task.WaitAsync(Timeout, Token);
         await stop.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
 
         Assert.Equal("id1", Encoding.UTF8.GetString(message.CorrelationData));
-        Assert.Equal("Telegram|1|hello", JsonSerializer.Deserialize<IncomingSms>(message.ConvertPayloadToString())!.Text);
+        Assert.Equal(new IncomingSms(PhoneNumber, "Telegram|1|hello"), JsonSerializer.Deserialize<IncomingSms>(message.ConvertPayloadToString()));
     }
 
     [Fact]
@@ -218,12 +221,12 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
         var forwarder = services.GetRequiredService<IncomingSmsForwarder>();
         using var early = new CancellationTokenSource(TimeSpan.FromSeconds(1));
 
-        await Assert.ThrowsAnyAsync<Exception>(() => forwarder.Forward("Telegram|1|early", "id1", early.Token));
+        await Assert.ThrowsAnyAsync<Exception>(() => forwarder.Forward(PhoneNumber, "Telegram|1|early", "id1", early.Token));
 
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
         var running = services.GetRequiredService<MessageListener>().Run(stop.Token);
         await handler.IsConnected.WaitAsync(Timeout, Token);
-        await forwarder.Forward("Telegram|1|later", "id2", Token);
+        await forwarder.Forward(PhoneNumber, "Telegram|1|later", "id2", Token);
         var message = await received.Task.WaitAsync(Timeout, Token);
         await stop.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
@@ -298,7 +301,7 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
     private MqttApplicationMessageBuilder Sms(string text) => new MqttApplicationMessageBuilder()
         .WithTopic(_topic)
-        .WithPayload(JsonSerializer.Serialize(new OutgoingSms(text)))
+        .WithPayload(JsonSerializer.Serialize(new OutgoingSms(PhoneNumber, text)))
         .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce);
 
     private static async Task<IMqttClient> Connect(Uri broker, Action<MqttClientOptionsBuilder>? configure = null)
@@ -374,6 +377,8 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
         public List<string> Texts { get; } = [];
 
+        public List<string> Recipients { get; } = [];
+
         public Task Done => expected == 0 ? Task.CompletedTask : _done.Task;
 
         public Task IsConnected => _connected.Task;
@@ -382,10 +387,11 @@ public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFix
 
         public int Calls { get; private set; }
 
-        public Task Handle(string text)
+        public Task Handle(string to, string text)
         {
             Calls++;
             check?.Invoke(text);
+            Recipients.Add(to);
             Texts.Add(text);
             if (Texts.Count == expected)
                 _done.TrySetResult();

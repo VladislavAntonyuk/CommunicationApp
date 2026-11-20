@@ -20,6 +20,8 @@ public class ApiFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
 
+    public const string ClientPhoneNumber = "+380501234567";
+
     public FakeSenders Senders { get; } = new();
 
     public FakeTelegramLogin TelegramLogin { get; } = new();
@@ -35,6 +37,7 @@ public class ApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _connection.Open();
+        builder.UseSetting("Client:PhoneNumber", ClientPhoneNumber);
 
         builder.ConfigureTestServices(services =>
         {

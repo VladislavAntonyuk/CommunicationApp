@@ -2,7 +2,7 @@ namespace CommunicationApp.Services;
 
 public interface IMessageHandler
 {
-    Task Handle(string text);
+    Task Handle(string to, string text);
 
     void Connected();
 

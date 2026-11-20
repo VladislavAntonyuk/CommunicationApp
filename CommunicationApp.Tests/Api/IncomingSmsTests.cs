@@ -46,6 +46,19 @@ public sealed class IncomingSmsTests(MosquittoFixture mosquitto) : IClassFixture
     }
 
     [Fact]
+    public async Task UnknownSender_IsIgnored()
+    {
+        await using var factory = await Start();
+        await Publish(factory, "+380991112233", "Telegram|123|hello", "id1");
+        await Publish(factory, "0501234567", "Telegram|123|next", "id2");
+
+        await WaitForResult(factory, "id2");
+
+        Assert.Equal(["next"], factory.Senders.Sent.Select(sent => sent.Text));
+        Assert.Null(await FindResult(factory, "id1"));
+    }
+
+    [Fact]
     public async Task InvalidText_IsRecordedFailedWithoutSending()
     {
         await using var factory = await Start();
@@ -105,7 +118,10 @@ public sealed class IncomingSmsTests(MosquittoFixture mosquitto) : IClassFixture
         return factory;
     }
 
-    private async Task Publish(BrokerApiFactory factory, string text, string id)
+    private Task Publish(BrokerApiFactory factory, string text, string id) =>
+        Publish(factory, ApiFactory.ClientPhoneNumber, text, id);
+
+    private async Task Publish(BrokerApiFactory factory, string from, string text, string id)
     {
         using var client = new MqttClientFactory().CreateMqttClient();
         await client.ConnectAsync(new MqttClientOptionsBuilder()
@@ -114,7 +130,7 @@ public sealed class IncomingSmsTests(MosquittoFixture mosquitto) : IClassFixture
             .Build(), Token);
         await client.PublishAsync(new MqttApplicationMessageBuilder()
             .WithTopic(factory.IncomingTopic)
-            .WithPayload(JsonSerializer.Serialize(new IncomingSms(text)))
+            .WithPayload(JsonSerializer.Serialize(new IncomingSms(from, text)))
             .WithCorrelationData(Encoding.UTF8.GetBytes(id))
             .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
             .Build(), Token);
@@ -126,17 +142,19 @@ public sealed class IncomingSmsTests(MosquittoFixture mosquitto) : IClassFixture
         var deadline = DateTime.UtcNow + Timeout;
         while (true)
         {
-            using (var scope = factory.Services.CreateScope())
-            {
-                var message = await scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>().IncomingMessages
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(m => m.Id == id, Token);
-                if (message != null)
-                    return message;
-            }
+            if (await FindResult(factory, id) is { } message)
+                return message;
 
             Assert.True(DateTime.UtcNow < deadline, $"Incoming SMS {id} was not processed");
             await Task.Delay(100, Token);
         }
+    }
+
+    private static async Task<IncomingMessage?> FindResult(BrokerApiFactory factory, string id)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>().IncomingMessages
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Id == id, Token);
     }
 }

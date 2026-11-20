@@ -1,12 +1,12 @@
 namespace CommunicationApp.Services;
 
-public sealed class MessageForwarder(ISmsSender smsSender, ForwardingStatus status, IPreferences preferences) : IMessageHandler
+public sealed class MessageForwarder(ISmsSender smsSender, ForwardingStatus status) : IMessageHandler
 {
-    public async Task Handle(string text)
+    public async Task Handle(string to, string text)
     {
         try
         {
-            await smsSender.Send(preferences.Get("from", ""), text);
+            await smsSender.Send(to, text);
         }
         catch (Exception ex)
         {

@@ -38,6 +38,8 @@ public class ApiFactory : WebApplicationFactory<Program>
     {
         _connection.Open();
         builder.UseSetting("Client:PhoneNumber", ClientPhoneNumber);
+        builder.UseSetting("Auth:AllowedRegions:0", "UA");
+        builder.UseSetting("Auth:AllowedRegions:1", "US");
 
         builder.ConfigureTestServices(services =>
         {

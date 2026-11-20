@@ -1,5 +1,6 @@
 using CommunicationApi.Database;
 using CommunicationApi.Services;
+using CommunicationApi.Services.Auth;
 using CommunicationApi.Services.Email;
 using CommunicationApi.Services.Messaging;
 using CommunicationApi.Services.Slack;
@@ -26,6 +27,8 @@ builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slac
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"));
 builder.Services.Configure<ClientSettings>(builder.Configuration.GetSection("Client"));
+builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection("Auth"));
+builder.Services.AddScoped<LoginCodeService>();
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
 builder.Services.AddSilverback()
     .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
@@ -74,6 +77,20 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPub
 
     await publisher.PublishAsync(new OutgoingSms(client.Value.PhoneNumber, request.Text, id));
 }).WithDescription("Service sends webhooks on this endpoint.");
+
+app.MapPost("/auth/code", async (LoginCodeService codes, HttpResponse response, LoginPhone request) =>
+    {
+        switch (await codes.SendCode(request.PhoneNumber))
+        {
+            case SendCodeResult.Sent sent:
+                return Results.Ok(new LoginPhone(sent.PhoneNumber));
+            case SendCodeResult.TooSoon tooSoon:
+                response.Headers.RetryAfter = ((int)Math.Ceiling(tooSoon.RetryAfter.TotalSeconds)).ToString();
+                return Results.Problem("Too many codes requested, try again later", statusCode: StatusCodes.Status429TooManyRequests);
+            default:
+                return Results.Problem("Invalid phone number", statusCode: StatusCodes.Status400BadRequest);
+        }
+    }).WithDescription("Sends a login code by SMS to the phone number.");
 
 app.MapGet("/providers",
     async (CommunicationApiDbContext dbContext, IConfiguration configuration) =>

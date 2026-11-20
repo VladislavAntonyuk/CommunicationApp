@@ -24,7 +24,10 @@
     <Compile Include="..\CommunicationApp\Services\BrokerClientsConfigurator.cs" Link="Gateway\BrokerClientsConfigurator.cs" />
     <Compile Include="..\CommunicationApp\Services\IMessageHandler.cs" Link="Gateway\IMessageHandler.cs" />
     <Compile Include="..\CommunicationApp\Services\MqttSettings.cs" Link="Gateway\MqttSettings.cs" />
+    <Compile Include="..\CommunicationApp\Services\SkippedSmsReplier.cs" Link="Gateway\SkippedSmsReplier.cs" />
+    <Compile Include="..\CommunicationApp\Services\IncomingSmsForwarder.cs" Link="Gateway\IncomingSmsForwarder.cs" />
     <None Include="..\CommunicationApp.AppHost\mosquitto\mosquitto.conf" Link="mosquitto.conf" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="mosquitto.passwd" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

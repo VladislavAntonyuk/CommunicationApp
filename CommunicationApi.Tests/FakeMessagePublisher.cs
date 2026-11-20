@@ -1,5 +1,5 @@
+using Shared;
 using Silverback;
-using Silverback.Messaging.Messages;
 using Silverback.Messaging.Publishing;
 
 namespace CommunicationApi.Tests;
@@ -12,7 +12,7 @@ public sealed class FakeMessagePublisher : IPublisher
 
     public Task PublishAsync(object message, CancellationToken cancellationToken = default)
     {
-        Published.Add(((StringMessage)message).Content!);
+        Published.Add(((OutgoingSms)message).Text);
         return Task.CompletedTask;
     }
 

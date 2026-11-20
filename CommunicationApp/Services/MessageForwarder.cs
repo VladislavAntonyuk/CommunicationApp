@@ -2,21 +2,19 @@ namespace CommunicationApp.Services;
 
 public sealed class MessageForwarder(ISmsSender smsSender, ForwardingStatus status, IPreferences preferences) : IMessageHandler
 {
-    public Task Handle(string text)
+    public async Task Handle(string text)
     {
         try
         {
-            smsSender.Send(preferences.Get("from", ""), text);
+            await smsSender.Send(preferences.Get("from", ""), text);
         }
         catch (Exception ex)
         {
-            var reason = $"Could not send SMS: {ex.Message}";
-            status.Failed(0, reason);
-            throw new InvalidOperationException(reason, ex);
+            status.Failed(0, $"Could not send SMS: {ex.Message}");
+            throw;
         }
 
         status.Succeeded(1);
-        return Task.CompletedTask;
     }
 
     public void Connected() => status.Succeeded(0);

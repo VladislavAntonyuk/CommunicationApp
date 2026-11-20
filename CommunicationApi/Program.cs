@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using Shared;
 using Silverback.Configuration;
 using Silverback.Messaging.Configuration;
-using Silverback.Messaging.Messages;
 using Silverback.Messaging.Publishing;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,11 +26,15 @@ builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
 builder.Services.AddSilverback()
     .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
-    .AddBrokerClientsConfigurator<BrokerClientsConfigurator>();
+    .AddBrokerClientsConfigurator<BrokerClientsConfigurator>()
+    .AddScopedSubscriber<SmsAckSubscriber>()
+    .AddScopedSubscriber<IncomingSmsSubscriber>()
+    .AddScopedErrorPolicyCallback<IncomingSmsSkipRecorder>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<ISlackService, SlackService>();
 builder.Services.AddScoped<ITeamsService, TeamsService>();
+builder.Services.AddScoped<IncomingSmsRouter>();
 builder.Services.AddHostedService<TelegramBackgroundService>();
 builder.Services.AddHostedService<SlackBackgroundService>();
 builder.Services.AddSingleton<TelegramLogin>();
@@ -50,61 +53,6 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/send", async (IServiceProvider serviceProvider, ILogger<Program> logger, Shared.Message message) =>
-{
-    if (string.IsNullOrWhiteSpace(message.Text))
-        return Results.Problem("Text is required", statusCode: StatusCodes.Status400BadRequest);
-
-    var targetName = message.Text.Split('|', 2)[0].Trim();
-    if (!Enum.GetNames<Target>().Contains(targetName, StringComparer.OrdinalIgnoreCase))
-        return Results.Problem($"Unknown target '{targetName}'", statusCode: StatusCodes.Status400BadRequest);
-
-    var target = Enum.Parse<Target>(targetName, true);
-    var fieldCount = target == Target.Email ? 4 : 3;
-    
-    var parts = message.Text.Split('|', fieldCount);
-    if (parts.Length < fieldCount)
-        return Results.Problem(
-            target == Target.Email ? "Expected Email|to|subject|text" : $"Expected {target}|recipient|text",
-            statusCode: StatusCodes.Status400BadRequest);
-
-    if (target == Target.Telegram && !long.TryParse(parts[1], out _))
-        return Results.Problem("Telegram recipient must be a numeric chat id", statusCode: StatusCodes.Status400BadRequest);
-
-    using var scope = serviceProvider.CreateScope();
-    try
-    {
-        switch (target)
-        {
-            case Target.Email:
-                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                var status = await emailService.Send(parts[1], parts[2], parts[3]);
-                return string.Equals(status, "success", StringComparison.OrdinalIgnoreCase)
-                    ? Results.Ok(status)
-                    : Results.Problem($"Email is not sent: {status}", statusCode: StatusCodes.Status502BadGateway);
-            case Target.Telegram:
-                var telegramService = scope.ServiceProvider.GetRequiredService<ITelegramService>();
-                await telegramService.Send(parts[1], parts[2]);
-                return Results.Ok();
-            case Target.Teams:
-                var teamsService = scope.ServiceProvider.GetRequiredService<ITeamsService>();
-                await teamsService.Send(parts[1], parts[2]);
-                return Results.Ok();
-            case Target.Slack:
-                var slackService = scope.ServiceProvider.GetRequiredService<ISlackService>();
-                await slackService.Send(parts[1], parts[2]);
-                return Results.Ok();
-            default:
-                throw new ArgumentOutOfRangeException();
-        }
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Failed to send {Target} message", target);
-        return Results.Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway);
-    }
-}).WithDescription("Android client sends request to this endpoint.");
-
 app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, Target target, Shared.Message request) =>
 {
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
@@ -117,7 +65,11 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPub
             return;
     }
 
-    await publisher.PublishAsync(new StringMessage(request.Text));
+    var id = Guid.NewGuid().ToString("N");
+    dbContext.OutgoingMessages.Add(new OutgoingMessage { Id = id, CreatedAt = DateTime.UtcNow });
+    await dbContext.SaveChangesAsync();
+
+    await publisher.PublishAsync(new OutgoingSms(request.Text, id));
 }).WithDescription("Service sends webhooks on this endpoint.");
 
 app.MapGet("/providers",

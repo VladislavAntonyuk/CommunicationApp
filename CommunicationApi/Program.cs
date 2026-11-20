@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CommunicationApi.Database;
 using CommunicationApi.Services;
 using CommunicationApi.Services.Auth;
@@ -6,6 +7,7 @@ using CommunicationApi.Services.Messaging;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
+using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Shared;
@@ -29,6 +31,8 @@ builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"
 builder.Services.Configure<ClientSettings>(builder.Configuration.GetSection("Client"));
 builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection("Auth"));
 builder.Services.AddScoped<LoginCodeService>();
+builder.Services.AddAuthentication(BearerTokenDefaults.AuthenticationScheme).AddBearerToken();
+builder.Services.AddAuthorization();
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
 builder.Services.AddSilverback()
     .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
@@ -91,6 +95,23 @@ app.MapPost("/auth/code", async (LoginCodeService codes, HttpResponse response, 
                 return Results.Problem("Invalid phone number", statusCode: StatusCodes.Status400BadRequest);
         }
     }).WithDescription("Sends a login code by SMS to the phone number.");
+
+app.MapPost("/auth/login", async (LoginCodeService codes, LoginRequest request) =>
+        await codes.CheckCode(request.PhoneNumber, request.Code) switch
+        {
+            CheckCodeResult.Valid valid => Results.SignIn(
+                new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim(ClaimTypes.NameIdentifier, valid.User.Id.ToString()),
+                        new Claim(ClaimTypes.MobilePhone, valid.User.PhoneNumber)
+                    ],
+                    BearerTokenDefaults.AuthenticationScheme)),
+                authenticationScheme: BearerTokenDefaults.AuthenticationScheme),
+            CheckCodeResult.TooManyAttempts => Results.Problem("Too many wrong codes, try again later", statusCode: StatusCodes.Status429TooManyRequests),
+            CheckCodeResult.Invalid invalid => Results.Problem(invalid.Reason, statusCode: StatusCodes.Status400BadRequest),
+            _ => throw new InvalidOperationException()
+        })
+    .WithDescription("Checks the login code and returns access and refresh tokens.");
 
 app.MapGet("/providers",
     async (CommunicationApiDbContext dbContext, IConfiguration configuration) =>

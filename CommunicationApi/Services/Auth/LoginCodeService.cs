@@ -17,6 +17,15 @@ public abstract record SendCodeResult
     public sealed record TooSoon(TimeSpan RetryAfter) : SendCodeResult;
 }
 
+public abstract record CheckCodeResult
+{
+    public sealed record Valid(User User) : CheckCodeResult;
+
+    public sealed record Invalid(string Reason) : CheckCodeResult;
+
+    public sealed record TooManyAttempts : CheckCodeResult;
+}
+
 public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<AuthSettings> options)
 {
     private static readonly TimeSpan LimitWindow = TimeSpan.FromHours(1);
@@ -54,5 +63,46 @@ public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPubli
 
         await publisher.PublishAsync(new OutgoingSms(phoneNumber, $"Your login code: {code}", id));
         return new SendCodeResult.Sent(phoneNumber);
+    }
+
+    public async Task<CheckCodeResult> CheckCode(string? input, string? code)
+    {
+        var settings = options.Value;
+        var phoneNumber = PhoneNumberNormalizer.ToE164(input, settings.DefaultRegion, settings.AllowedRegions);
+        if (phoneNumber == null || string.IsNullOrWhiteSpace(code))
+            return new CheckCodeResult.Invalid("Wrong phone number or code");
+
+        var now = DateTime.UtcNow;
+        var since = now - LimitWindow;
+        var recent = await dbContext.LoginCodes
+            .AsTracking()
+            .Where(x => x.PhoneNumber == phoneNumber && x.CreatedAt > since)
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync();
+
+        if (recent.Sum(x => x.FailedAttempts) >= settings.MaxFailedAttemptsPerHour)
+            return new CheckCodeResult.TooManyAttempts();
+
+        var latest = recent.LastOrDefault();
+        if (latest == null || now - latest.CreatedAt > settings.CodeLifetime)
+            return new CheckCodeResult.Invalid("Code expired, request a new one");
+
+        if (Hasher.VerifyHashedPassword(latest, latest.CodeHash, code.Trim()) == PasswordVerificationResult.Failed)
+        {
+            latest.FailedAttempts++;
+            await dbContext.SaveChangesAsync();
+            return new CheckCodeResult.Invalid("Wrong phone number or code");
+        }
+
+        dbContext.LoginCodes.Remove(latest);
+        var user = await dbContext.Users.AsTracking().FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
+        if (user == null)
+        {
+            user = new User { PhoneNumber = phoneNumber, CreatedAt = now };
+            dbContext.Users.Add(user);
+        }
+
+        await dbContext.SaveChangesAsync();
+        return new CheckCodeResult.Valid(user);
     }
 }

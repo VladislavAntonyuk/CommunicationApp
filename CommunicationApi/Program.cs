@@ -118,7 +118,9 @@ app.MapPost("/auth/refresh", async (IOptionsMonitor<BearerTokenOptions> bearerOp
     })
     .WithDescription("Exchanges a refresh token for new access and refresh tokens.");
 
-app.MapGet("/providers",
+var protectedApi = app.MapGroup("").RequireAuthorization();
+
+protectedApi.MapGet("/providers",
     async (CommunicationApiDbContext dbContext, IConfiguration configuration) =>
     {
         var disabled = await dbContext.ProviderSettings
@@ -130,7 +132,7 @@ app.MapGet("/providers",
             new ProviderStatus(x, !disabled.Contains(x), ReceivingProviders.IsConfigured(x, configuration)));
     }).WithDescription("Providers that can receive messages, and whether receiving is switched on for each.");
 
-app.MapPut("/providers/{target}",
+protectedApi.MapPut("/providers/{target}",
     async (CommunicationApiDbContext dbContext, Target target, ProviderSwitch request) =>
     {
         if (!ReceivingProviders.All.Contains(target))
@@ -146,7 +148,7 @@ app.MapPut("/providers/{target}",
         return Results.Ok();
     }).WithDescription("Switches receiving from a provider on or off.");
 
-app.MapGet("/providers/{target}/chats",
+protectedApi.MapGet("/providers/{target}/chats",
     async (CommunicationApiDbContext dbContext, ITelegramService telegramService, ILogger<Program> logger, Target target) =>
     {
         if (target != Target.Telegram)
@@ -169,7 +171,7 @@ app.MapGet("/providers/{target}/chats",
         }
     }).WithDescription("Chats of a provider, and whether messages from each are received.");
 
-app.MapPut("/providers/{target}/chats/{chatId}",
+protectedApi.MapPut("/providers/{target}/chats/{chatId}",
     async (CommunicationApiDbContext dbContext, Target target, string chatId, ProviderSwitch request) =>
     {
         if (target != Target.Telegram)
@@ -185,16 +187,16 @@ app.MapPut("/providers/{target}/chats/{chatId}",
         return Results.Ok();
     }).WithDescription("Switches receiving from one chat on or off.");
 
-app.MapGet("/telegram/login", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.GetStatus, logger))
+protectedApi.MapGet("/telegram/login", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.GetStatus, logger))
     .WithDescription("What is needed next to log in to Telegram: the phone, the code, the password, or nothing.");
 
-app.MapPost("/telegram/login", (ITelegramLogin login, ILogger<Program> logger, TelegramLoginValue request) =>
+protectedApi.MapPost("/telegram/login", (ITelegramLogin login, ILogger<Program> logger, TelegramLoginValue request) =>
         string.IsNullOrWhiteSpace(request.Value)
             ? Task.FromResult(Results.Problem("Value is required", statusCode: StatusCodes.Status400BadRequest))
             : TelegramLoginResult(() => login.Submit(request.Value), logger))
     .WithDescription("Takes the value the login is waiting for and returns what is needed next.");
 
-app.MapPost("/telegram/logout", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.Logout, logger))
+protectedApi.MapPost("/telegram/logout", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.Logout, logger))
     .WithDescription("Logs out of Telegram, or abandons a login that is waiting for a code or password.");
 
 using var scope = app.Services.CreateScope();

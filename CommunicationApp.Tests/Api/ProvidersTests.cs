@@ -84,11 +84,12 @@ public sealed class ProvidersTests : ApiTest
     [InlineData("12345", "", false)]
     public async Task Get_TelegramConfigured_DependsOnSettings(string appId, string appHash, bool expected)
     {
-        var client = Factory.WithWebHostBuilder(builder =>
+        var factory = Factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Telegram:AppId", appId);
             builder.UseSetting("Telegram:AppHash", appHash);
-        }).CreateClient();
+        });
+        var client = factory.CreateClient().Authorized(factory.Services);
 
         var providers = await Get(client);
 
@@ -101,11 +102,12 @@ public sealed class ProvidersTests : ApiTest
     [InlineData("", false)]
     public async Task Get_SlackConfigured_DependsOnSettings(string appLevelToken, bool expected)
     {
-        var client = Factory.WithWebHostBuilder(builder =>
+        var factory = Factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Slack:ApiToken", "token");
             builder.UseSetting("Slack:AppLevelToken", appLevelToken);
-        }).CreateClient();
+        });
+        var client = factory.CreateClient().Authorized(factory.Services);
 
         var providers = await Get(client);
 

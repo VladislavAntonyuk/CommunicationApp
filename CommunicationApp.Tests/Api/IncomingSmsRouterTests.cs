@@ -1,7 +1,7 @@
 using CommunicationApi.Services;
 using CommunicationApi.Services.Telegram;
 using CommunicationApp.Tests.Helpers;
-using Shared;
+using Shared.Api;
 using SlackNet;
 
 namespace CommunicationApp.Tests.Api;

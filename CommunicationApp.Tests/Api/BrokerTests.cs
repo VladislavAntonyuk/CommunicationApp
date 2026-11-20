@@ -9,6 +9,7 @@ using MQTTnet;
 using MQTTnet.Formatter;
 using MQTTnet.Protocol;
 using Shared;
+using Shared.Api;
 
 namespace CommunicationApp.Tests.Api;
 

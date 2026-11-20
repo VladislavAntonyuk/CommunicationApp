@@ -1,5 +1,5 @@
 using CommunicationApi.Services.Telegram;
-using Shared;
+using Shared.Api;
 
 namespace CommunicationApp.Tests.Helpers;
 

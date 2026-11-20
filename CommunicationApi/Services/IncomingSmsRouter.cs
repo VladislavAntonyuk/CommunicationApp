@@ -2,7 +2,7 @@ using CommunicationApi.Services.Email;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
-using Shared;
+using Shared.Api;
 using SlackNet;
 
 namespace CommunicationApi.Services;

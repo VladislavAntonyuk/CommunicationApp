@@ -2,7 +2,7 @@ using CommunicationClient.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Refit;
-using Shared;
+using Shared.Api;
 
 namespace CommunicationClient.ViewModels;
 

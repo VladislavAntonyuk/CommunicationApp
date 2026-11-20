@@ -4,7 +4,7 @@ using CommunicationApi.Database;
 using CommunicationApp.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Shared;
+using Shared.Api;
 
 namespace CommunicationApp.Tests.Api;
 

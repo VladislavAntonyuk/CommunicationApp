@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
-using Shared;
+using Shared.Api;
 using TL;
 
 namespace CommunicationApi.Services.Telegram;
@@ -32,7 +32,7 @@ public class TelegramBackgroundService(IServiceProvider serviceProvider, Telegra
                         _ => ChatKind.Group
                     };
 
-                    var payload = new Shared.Message($"Telegram|{mb.peer_id.ID}|{mb.message}", mb.peer_id.ID.ToString(), kind);
+                    var payload = new Shared.Api.Message($"Telegram|{mb.peer_id.ID}|{mb.message}", mb.peer_id.ID.ToString(), kind);
 
                     await http.PostAsJsonAsync($"{addresses.FirstOrDefault()}/notify/{Target.Telegram}", payload, cancellationToken: stoppingToken);
                 }

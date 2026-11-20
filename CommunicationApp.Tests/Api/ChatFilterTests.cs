@@ -2,7 +2,7 @@ using System.Net.Http.Json;
 using CommunicationApi.Database;
 using CommunicationApp.Tests.Helpers;
 using Microsoft.Extensions.DependencyInjection;
-using Shared;
+using Shared.Api;
 
 namespace CommunicationApp.Tests.Api;
 

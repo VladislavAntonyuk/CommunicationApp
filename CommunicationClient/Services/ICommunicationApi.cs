@@ -1,5 +1,5 @@
 using Refit;
-using Shared;
+using Shared.Api;
 
 namespace CommunicationClient.Services;
 

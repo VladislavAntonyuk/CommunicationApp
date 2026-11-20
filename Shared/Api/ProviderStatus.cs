@@ -1,4 +1,4 @@
-namespace Shared;
+namespace Shared.Api;
 
 public record ProviderStatus(Target Target, bool Enabled, bool Configured);
 

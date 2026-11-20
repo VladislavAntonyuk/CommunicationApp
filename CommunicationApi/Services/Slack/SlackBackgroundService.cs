@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.Options;
-using Shared;
+using Shared.Api;
 using SlackNet;
 using SlackNet.Events;
 
@@ -37,7 +37,7 @@ class SlackMessageReceivedEventHandler(string? address) : IEventHandler<MessageE
 
         using var http = new HttpClient();
 
-        var payload = new Shared.Message($"Slack|{slackEvent.User}|{slackEvent.Text}");
+        var payload = new Shared.Api.Message($"Slack|{slackEvent.User}|{slackEvent.Text}");
 
         await http.PostAsJsonAsync($"{address}/notify/{Target.Slack}", payload);
     }

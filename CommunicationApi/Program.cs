@@ -7,6 +7,7 @@ using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
 using Microsoft.EntityFrameworkCore;
 using Shared;
+using Shared.Api;
 using Silverback.Configuration;
 using Silverback.Messaging.Configuration;
 using Silverback.Messaging.Publishing;
@@ -53,7 +54,7 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, Target target, Shared.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, Target target, Shared.Api.Message request) =>
 {
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;

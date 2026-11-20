@@ -1,6 +1,6 @@
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Telegram;
-using Shared;
+using Shared.Api;
 
 namespace CommunicationApi.Services;
 

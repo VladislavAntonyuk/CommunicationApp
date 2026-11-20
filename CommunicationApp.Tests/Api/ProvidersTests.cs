@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using CommunicationApp.Tests.Helpers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
-using Shared;
+using Shared.Api;
 
 namespace CommunicationApp.Tests.Api;
 

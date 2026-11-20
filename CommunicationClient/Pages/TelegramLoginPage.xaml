@@ -3,7 +3,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             xmlns:shared="clr-namespace:Shared;assembly=Shared"
+             xmlns:shared="clr-namespace:Shared.Api;assembly=Shared"
              xmlns:viewModels="clr-namespace:CommunicationClient.ViewModels"
              x:Class="CommunicationClient.Pages.TelegramLoginPage"
              x:DataType="viewModels:TelegramLoginViewModel"

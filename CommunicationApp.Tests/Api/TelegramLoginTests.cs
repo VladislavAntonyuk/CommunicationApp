@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using CommunicationApi.Services.Telegram;
 using CommunicationApp.Tests.Helpers;
 using Microsoft.AspNetCore.Mvc;
-using Shared;
+using Shared.Api;
 
 namespace CommunicationApp.Tests.Api;
 

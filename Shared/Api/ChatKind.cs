@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Shared;
+namespace Shared.Api;
 
 [JsonConverter(typeof(JsonStringEnumConverter<ChatKind>))]
 public enum ChatKind

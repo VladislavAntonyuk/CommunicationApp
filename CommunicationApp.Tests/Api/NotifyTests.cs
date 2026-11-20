@@ -1,11 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using CommunicationApi.Database;
+using CommunicationApp.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shared;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Api;
 
 public sealed class NotifyTests : ApiTest
 {

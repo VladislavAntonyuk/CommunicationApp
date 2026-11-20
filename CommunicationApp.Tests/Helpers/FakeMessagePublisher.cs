@@ -2,7 +2,7 @@ using Shared;
 using Silverback;
 using Silverback.Messaging.Publishing;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Helpers;
 
 public sealed class FakeMessagePublisher : IPublisher
 {

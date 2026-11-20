@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Helpers;
 
 public sealed class BrokerApiFactory(string connectionString) : ApiFactory
 {

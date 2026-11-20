@@ -2,7 +2,7 @@ using System.Text;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Helpers;
 
 public sealed class MosquittoFixture : IAsyncLifetime
 {

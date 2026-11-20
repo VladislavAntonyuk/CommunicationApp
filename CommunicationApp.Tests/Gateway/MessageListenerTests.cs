@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using CommunicationApp.Services;
+using CommunicationApp.Tests.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using MQTTnet;
 using MQTTnet.Formatter;
@@ -11,7 +12,7 @@ using Silverback.Configuration;
 using Silverback.Messaging.Consuming.ErrorHandling;
 using Silverback.Messaging.Messages;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Gateway;
 
 public sealed class MessageListenerTests(MosquittoFixture mosquitto) : IClassFixture<MosquittoFixture>
 {

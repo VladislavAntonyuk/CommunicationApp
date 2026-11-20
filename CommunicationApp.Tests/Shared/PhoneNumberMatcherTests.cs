@@ -1,6 +1,6 @@
 using Shared;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Shared;
 
 public sealed class PhoneNumberMatcherTests
 {

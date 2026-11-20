@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using CommunicationApi.Database;
+using CommunicationApp.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MQTTnet;
@@ -9,7 +10,7 @@ using MQTTnet.Formatter;
 using MQTTnet.Protocol;
 using Shared;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Api;
 
 public sealed class BrokerTests(MosquittoFixture mosquitto) : IClassFixture<MosquittoFixture>
 {

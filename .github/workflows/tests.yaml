@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: CommunicationApi.Tests
+        working-directory: CommunicationApp.Tests
     steps:
       - name: Checkout
         uses: actions/checkout@v7

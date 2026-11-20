@@ -1,7 +1,7 @@
 using CommunicationApi.Services.Telegram;
 using Shared;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Helpers;
 
 public sealed class FakeTelegramLogin : ITelegramLogin
 {

@@ -1,10 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using CommunicationApp.Tests.Helpers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Shared;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Api;
 
 public sealed class ProvidersTests : ApiTest
 {

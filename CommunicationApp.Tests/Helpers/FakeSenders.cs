@@ -4,7 +4,7 @@ using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
 using Shared;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Helpers;
 
 public record SentMessage(Target Target, string Recipient, string? Subject, string Text);
 

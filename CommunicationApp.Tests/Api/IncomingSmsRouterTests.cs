@@ -1,9 +1,10 @@
 using CommunicationApi.Services;
 using CommunicationApi.Services.Telegram;
+using CommunicationApp.Tests.Helpers;
 using Shared;
 using SlackNet;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Api;
 
 public sealed class IncomingSmsRouterTests
 {

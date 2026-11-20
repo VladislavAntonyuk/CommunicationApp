@@ -1,4 +1,4 @@
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Helpers;
 
 public abstract class ApiTest : IAsyncDisposable
 {

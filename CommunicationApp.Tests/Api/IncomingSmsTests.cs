@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using CommunicationApi.Database;
 using CommunicationApi.Services.Telegram;
+using CommunicationApp.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MQTTnet;
@@ -9,7 +10,7 @@ using MQTTnet.Formatter;
 using MQTTnet.Protocol;
 using Shared;
 
-namespace CommunicationApi.Tests;
+namespace CommunicationApp.Tests.Api;
 
 public sealed class IncomingSmsTests(MosquittoFixture mosquitto) : IClassFixture<MosquittoFixture>
 {
@@ -81,7 +82,7 @@ public sealed class IncomingSmsTests(MosquittoFixture mosquitto) : IClassFixture
 
         Assert.False(message.Sent);
         Assert.Equal("Network is down", message.Error);
-        Assert.Equal(Services.Messaging.BrokerClientsConfigurator.MaxRetries + 1, factory.Senders.Attempts);
+        Assert.Equal(CommunicationApi.Services.Messaging.BrokerClientsConfigurator.MaxRetries + 1, factory.Senders.Attempts);
     }
 
     private async Task<BrokerApiFactory> Start()

@@ -40,7 +40,7 @@ public sealed class BrokerTests(MosquittoFixture mosquitto) : IClassFixture<Mosq
 
         response.EnsureSuccessStatusCode();
         var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
-        Assert.Equal("Teams|1|hello", JsonSerializer.Deserialize<OutgoingSms>(message.ConvertPayloadToString())!.Text);
+        Assert.Equal(new OutgoingSms(ApiFactory.ClientPhoneNumber, "Teams|1|hello"), JsonSerializer.Deserialize<OutgoingSms>(message.ConvertPayloadToString()));
         Assert.Matches("^[0-9a-f]{32}$", Encoding.UTF8.GetString(message.CorrelationData));
         Assert.Equal(factory.AckTopic, message.ResponseTopic);
         Assert.InRange(message.MessageExpiryInterval, 3590u, 3600u);

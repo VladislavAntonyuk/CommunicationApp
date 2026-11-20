@@ -22,7 +22,6 @@
             Padding="30,0"
             Spacing="25">
 
-            <Entry Text="{Binding PhoneNumber}" Placeholder="From: +380987654321" />
             <HorizontalStackLayout Spacing="10">
                 <HorizontalStackLayout.GestureRecognizers>
                     <TapGestureRecognizer Command="{Binding ToggleAutoForwardCommand}" />

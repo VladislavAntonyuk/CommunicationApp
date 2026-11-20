@@ -6,6 +6,7 @@ using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Shared;
 using Shared.Api;
 using Silverback.Configuration;
@@ -24,6 +25,7 @@ builder.Services.Configure<HostOptions>(opts =>
 builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"));
+builder.Services.Configure<ClientSettings>(builder.Configuration.GetSection("Client"));
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
 builder.Services.AddSilverback()
     .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
@@ -54,7 +56,7 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, Target target, Shared.Api.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<ClientSettings> client, Target target, Shared.Api.Message request) =>
 {
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;
@@ -70,7 +72,7 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPub
     dbContext.OutgoingMessages.Add(new OutgoingMessage { Id = id, CreatedAt = DateTime.UtcNow });
     await dbContext.SaveChangesAsync();
 
-    await publisher.PublishAsync(new OutgoingSms(request.Text, id));
+    await publisher.PublishAsync(new OutgoingSms(client.Value.PhoneNumber, request.Text, id));
 }).WithDescription("Service sends webhooks on this endpoint.");
 
 app.MapGet("/providers",

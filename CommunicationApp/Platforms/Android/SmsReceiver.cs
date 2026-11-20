@@ -19,8 +19,8 @@ public class SmsReceiver : BroadcastReceiver
             if (messages == null || messages.Length == 0)
                 return;
 
-            if (Shared.PhoneNumberMatcher.IsSameNumber(messages[0].OriginatingAddress, Preferences.Get("from", null)))
-                IncomingSmsWorker.Enqueue(context, string.Concat(messages.Select(m => m.MessageBody)));
+            if (messages[0].OriginatingAddress is { Length: > 0 } from)
+                IncomingSmsWorker.Enqueue(context, from, string.Concat(messages.Select(m => m.MessageBody)));
         }
         catch (Exception ex)
         {

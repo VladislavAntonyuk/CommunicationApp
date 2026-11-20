@@ -1,6 +1,6 @@
 ﻿using CommunicationApp.ViewModels;
 
-namespace CommunicationApp;
+namespace CommunicationApp.Pages;
 
 public partial class MainPage : ContentPage
 {

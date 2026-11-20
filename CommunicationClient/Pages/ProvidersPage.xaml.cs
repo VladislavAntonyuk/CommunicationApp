@@ -1,6 +1,6 @@
 using CommunicationClient.ViewModels;
 
-namespace CommunicationClient;
+namespace CommunicationClient.Pages;
 
 public partial class ProvidersPage : ContentPage
 {

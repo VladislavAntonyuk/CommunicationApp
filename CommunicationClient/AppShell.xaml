@@ -3,11 +3,11 @@
     x:Class="CommunicationClient.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:CommunicationClient"
+    xmlns:pages="clr-namespace:CommunicationClient.Pages"
     Title="Communication Client">
 
     <ShellContent
-        ContentTemplate="{DataTemplate local:ProvidersPage}"
+        ContentTemplate="{DataTemplate pages:ProvidersPage}"
         Route="ProvidersPage" />
 
 </Shell>

@@ -1,4 +1,4 @@
-using Shared;
+using Shared.Api;
 using TL;
 
 namespace CommunicationApi.Services.Telegram;

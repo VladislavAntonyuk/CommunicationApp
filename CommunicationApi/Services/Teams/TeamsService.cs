@@ -1,7 +1,6 @@
 ﻿using Azure.Identity;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
-using CommunicationApi.Services;
 
 namespace CommunicationApi.Services.Teams;
 

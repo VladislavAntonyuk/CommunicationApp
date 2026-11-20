@@ -26,6 +26,7 @@ public sealed class IncomingSmsWorker(Context context, WorkerParameters paramete
             .SetConstraints(new Constraints.Builder()
                 .SetRequiredNetworkType(NetworkType.Connected!)
                 .Build())
+            .SetBackoffCriteria(BackoffPolicy.Linear!, 30, Java.Util.Concurrent.TimeUnit.Seconds!)
             .Build();
 
         WorkManager.GetInstance(context)!.EnqueueUniqueWork(WorkName, ExistingWorkPolicy.AppendOrReplace!, (OneTimeWorkRequest)request);

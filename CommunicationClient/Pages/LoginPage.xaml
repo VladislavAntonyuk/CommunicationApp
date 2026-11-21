@@ -12,7 +12,7 @@
     <ContentPage.Behaviors>
         <toolkit:EventToCommandBehavior EventName="Appearing"
                                         BindingContext="{Binding BindingContext, Source={x:Reference page}, x:DataType=ContentPage}"
-                                        Command="{Binding AppearingCommand}" />
+                                        Command="{Binding LoadCommand}" />
     </ContentPage.Behaviors>
 
     <ContentPage.Resources>

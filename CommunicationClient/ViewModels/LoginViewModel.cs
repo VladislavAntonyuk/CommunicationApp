@@ -37,7 +37,7 @@ public partial class LoginViewModel(IAuthApi auth, AuthSession session, INavigat
         : $"Code sent by SMS to {SentTo}";
 
     [RelayCommand]
-    private async Task Appearing()
+    private async Task Load()
     {
         if (await session.IsLoggedIn())
         {

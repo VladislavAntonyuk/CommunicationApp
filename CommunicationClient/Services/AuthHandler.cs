@@ -10,7 +10,7 @@ public sealed class AuthHandler(AuthSession session) : DelegatingHandler
         if (request.Content != null)
             await request.Content.LoadIntoBufferAsync(cancellationToken);
 
-        var accessToken = await session.AccessToken();
+        var accessToken = await session.GetAccessToken();
         if (accessToken == null)
             return await base.SendAsync(request, cancellationToken);
 
@@ -19,12 +19,12 @@ public sealed class AuthHandler(AuthSession session) : DelegatingHandler
         if (response.StatusCode != HttpStatusCode.Unauthorized)
             return response;
 
-        var refreshed = await session.Refresh(accessToken);
-        if (refreshed == null)
+        var newAccessToken = await session.RefreshAccessToken(accessToken);
+        if (newAccessToken == null)
             return response;
 
         response.Dispose();
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", refreshed);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newAccessToken);
         return await base.SendAsync(request, cancellationToken);
     }
 }

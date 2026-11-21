@@ -12,14 +12,14 @@ public sealed class AuthSession(ITokenStorage storage, IServiceProvider services
 
     public event Action? LoggedOut;
 
-    public async Task<bool> IsLoggedIn() => await AccessToken() != null;
+    public async Task<bool> IsLoggedIn() => await GetAccessToken() != null;
 
-    public async Task<string?> AccessToken()
+    public async Task<string?> GetAccessToken()
     {
         await _lock.WaitAsync();
         try
         {
-            return (await Current())?.AccessToken;
+            return (await GetTokens())?.AccessToken;
         }
         finally
         {
@@ -32,7 +32,7 @@ public sealed class AuthSession(ITokenStorage storage, IServiceProvider services
         await _lock.WaitAsync();
         try
         {
-            await Store(tokens);
+            await SaveTokens(tokens);
         }
         finally
         {
@@ -45,7 +45,7 @@ public sealed class AuthSession(ITokenStorage storage, IServiceProvider services
         await _lock.WaitAsync();
         try
         {
-            Forget();
+            ClearTokens();
         }
         finally
         {
@@ -55,13 +55,13 @@ public sealed class AuthSession(ITokenStorage storage, IServiceProvider services
         LoggedOut?.Invoke();
     }
 
-    public async Task<string?> Refresh(string rejectedAccessToken)
+    public async Task<string?> RefreshAccessToken(string rejectedAccessToken)
     {
         var loggedOut = false;
         await _lock.WaitAsync();
         try
         {
-            var tokens = await Current();
+            var tokens = await GetTokens();
             if (tokens == null)
                 return null;
 
@@ -70,11 +70,11 @@ public sealed class AuthSession(ITokenStorage storage, IServiceProvider services
 
             var response = await services.GetRequiredService<IAuthApi>().Refresh(new RefreshRequest(tokens.RefreshToken));
             if (response.IsSuccessfulWithContent)
-                return (await Store(response.Content)).AccessToken;
+                return (await SaveTokens(response.Content)).AccessToken;
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                Forget();
+                ClearTokens();
                 loggedOut = true;
             }
 
@@ -88,7 +88,7 @@ public sealed class AuthSession(ITokenStorage storage, IServiceProvider services
         }
     }
 
-    private async Task<SessionTokens?> Current()
+    private async Task<SessionTokens?> GetTokens()
     {
         if (!_loaded)
         {
@@ -99,7 +99,7 @@ public sealed class AuthSession(ITokenStorage storage, IServiceProvider services
         return _tokens;
     }
 
-    private async Task<SessionTokens> Store(AuthTokens tokens)
+    private async Task<SessionTokens> SaveTokens(AuthTokens tokens)
     {
         var session = new SessionTokens(tokens.AccessToken, tokens.RefreshToken);
         await storage.Save(session);
@@ -108,7 +108,7 @@ public sealed class AuthSession(ITokenStorage storage, IServiceProvider services
         return session;
     }
 
-    private void Forget()
+    private void ClearTokens()
     {
         storage.Clear();
         _tokens = null;

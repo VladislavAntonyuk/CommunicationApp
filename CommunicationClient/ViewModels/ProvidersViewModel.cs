@@ -6,7 +6,7 @@ using Shared.Api;
 
 namespace CommunicationClient.ViewModels;
 
-public partial class ProvidersViewModel(ICommunicationApi api, INavigationService navigation, IDialogService dialogs) : ObservableObject
+public partial class ProvidersViewModel(ICommunicationApi api, INavigationService navigation, IDialogService dialogs, AuthSession session) : ObservableObject
 {
     [ObservableProperty]
     public partial string? Status { get; set; }
@@ -60,6 +60,13 @@ public partial class ProvidersViewModel(ICommunicationApi api, INavigationServic
 
     [RelayCommand]
     private Task Login() => navigation.GoTo(nameof(TelegramLoginPage));
+
+    [RelayCommand]
+    private async Task SignOut()
+    {
+        if (await dialogs.Confirm("Sign out", "Sign out of this app?", "Sign out", "Cancel"))
+            await session.LogOut();
+    }
 
     [RelayCommand]
     private async Task Logout()

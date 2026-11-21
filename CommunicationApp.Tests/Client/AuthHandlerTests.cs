@@ -109,6 +109,17 @@ public sealed class AuthHandlerTests : IAsyncDisposable
         Assert.False(await Session.IsLoggedIn());
     }
 
+    [Fact]
+    public async Task WrongCode_ShowsServerMessage()
+    {
+        var auth = _services.GetRequiredService<IAuthApi>();
+        await auth.RequestCode(new LoginPhone(ApiFactory.ClientPhoneNumber));
+
+        var response = await auth.Login(new LoginRequest(ApiFactory.ClientPhoneNumber, "wrong"));
+
+        Assert.Equal("Wrong phone number or code", response.ErrorMessage);
+    }
+
     private async Task<AuthTokens> LogIn()
     {
         var auth = _services.GetRequiredService<IAuthApi>();

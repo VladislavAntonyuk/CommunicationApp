@@ -41,6 +41,7 @@ public static class MauiProgram
             .AddHttpMessageHandler<AuthHandler>();
         builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
         builder.Services.AddSingleton<IDialogService, ShellDialogService>();
+        builder.Services.AddTransient<LoginPage, LoginViewModel>();
         builder.Services.AddTransient<ProvidersPage, ProvidersViewModel>();
         builder.Services.AddTransientWithShellRoute<TelegramLoginPage, TelegramLoginViewModel>(nameof(TelegramLoginPage));
 

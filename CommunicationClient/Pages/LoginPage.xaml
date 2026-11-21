@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:viewModels="clr-namespace:CommunicationClient.ViewModels"
+             x:Class="CommunicationClient.Pages.LoginPage"
+             x:DataType="viewModels:LoginViewModel"
+             x:Name="page"
+             Title="Sign in">
+
+    <ContentPage.Behaviors>
+        <toolkit:EventToCommandBehavior EventName="Appearing"
+                                        BindingContext="{Binding BindingContext, Source={x:Reference page}, x:DataType=ContentPage}"
+                                        Command="{Binding AppearingCommand}" />
+    </ContentPage.Behaviors>
+
+    <ContentPage.Resources>
+        <toolkit:IsStringNotNullOrEmptyConverter x:Key="IsNotEmpty" />
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="30,0"
+            Spacing="25">
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <Label Text="{Binding Prompt}" IsVisible="{Binding IsReady}" />
+
+            <VerticalStackLayout Spacing="25" IsVisible="{Binding AsksForPhone}">
+                <Entry Text="{Binding PhoneNumber}"
+                       Placeholder="+380987654321"
+                       Keyboard="Telephone"
+                       ReturnCommand="{Binding SendCodeCommand}" />
+                <Button Text="Send code" Command="{Binding SendCodeCommand}" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="25" IsVisible="{Binding AsksForCode}">
+                <Entry Text="{Binding Code}"
+                       Placeholder="123456"
+                       Keyboard="Numeric"
+                       MaxLength="6"
+                       ReturnCommand="{Binding LogInCommand}" />
+                <Button Text="Sign in" Command="{Binding LogInCommand}" />
+                <Button Text="Send again" Command="{Binding SendCodeCommand}" />
+                <Button Text="Change number" Command="{Binding ChangeNumberCommand}" />
+            </VerticalStackLayout>
+
+            <Label Text="{Binding Error}" IsVisible="{Binding Error, Converter={StaticResource IsNotEmpty}}" />
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

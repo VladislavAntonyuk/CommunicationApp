@@ -15,6 +15,10 @@
                                         Command="{Binding LoadCommand}" />
     </ContentPage.Behaviors>
 
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Sign out" Command="{Binding SignOutCommand}" />
+    </ContentPage.ToolbarItems>
+
     <ContentPage.Resources>
         <toolkit:IsStringNotNullOrEmptyConverter x:Key="IsNotEmpty" />
     </ContentPage.Resources>

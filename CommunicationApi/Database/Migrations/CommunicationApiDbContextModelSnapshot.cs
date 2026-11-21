@@ -52,6 +52,33 @@ namespace CommunicationApi.Database.Migrations
                     b.ToTable("IncomingMessages");
                 });
 
+            modelBuilder.Entity("CommunicationApi.Database.LoginCode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PhoneNumber", "CreatedAt");
+
+                    b.ToTable("LoginCodes");
+                });
+
             modelBuilder.Entity("CommunicationApi.Database.OutgoingMessage", b =>
                 {
                     b.Property<string>("Id")
@@ -82,6 +109,27 @@ namespace CommunicationApi.Database.Migrations
                     b.HasKey("Target");
 
                     b.ToTable("ProviderSettings");
+                });
+
+            modelBuilder.Entity("CommunicationApi.Database.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PhoneNumber")
+                        .IsUnique();
+
+                    b.ToTable("Users");
                 });
 #pragma warning restore 612, 618
         }

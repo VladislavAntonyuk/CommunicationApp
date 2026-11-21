@@ -18,7 +18,13 @@ namespace CommunicationApp.Tests.Helpers;
 
 public class ApiFactory : WebApplicationFactory<Program>
 {
-    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private readonly string _connectionString = $"Data Source={Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+    private readonly SqliteConnection _connection;
+
+    public ApiFactory()
+    {
+        _connection = new SqliteConnection(_connectionString);
+    }
 
     public const string ClientPhoneNumber = "+380501234567";
 
@@ -38,6 +44,8 @@ public class ApiFactory : WebApplicationFactory<Program>
     {
         _connection.Open();
         builder.UseSetting("Client:PhoneNumber", ClientPhoneNumber);
+        builder.UseSetting("Auth:AllowedRegions:0", "UA");
+        builder.UseSetting("Auth:AllowedRegions:1", "US");
 
         builder.ConfigureTestServices(services =>
         {
@@ -45,7 +53,7 @@ public class ApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IDbContextOptionsConfiguration<CommunicationApiDbContext>>();
             services.RemoveAll<DbContextOptions<CommunicationApiDbContext>>();
-            services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(_connection));
+            services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(_connectionString));
 
             services.AddSingleton<IEmailService>(Senders);
             services.AddSingleton<ITelegramService>(Senders);

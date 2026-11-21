@@ -6,13 +6,15 @@ namespace CommunicationApp.Tests.Helpers;
 
 public sealed class FakeMessagePublisher : IPublisher
 {
-    public List<string> Published { get; } = [];
+    public List<OutgoingSms> Sms { get; } = [];
+
+    public List<string> Published => [.. Sms.Select(sms => sms.Text)];
 
     public ISilverbackContext Context => throw new NotSupportedException();
 
     public Task PublishAsync(object message, CancellationToken cancellationToken = default)
     {
-        Published.Add(((OutgoingSms)message).Text);
+        Sms.Add((OutgoingSms)message);
         return Task.CompletedTask;
     }
 

@@ -6,14 +6,11 @@
              xmlns:viewModels="clr-namespace:CommunicationClient.ViewModels"
              x:Class="CommunicationClient.Pages.LoginPage"
              x:DataType="viewModels:LoginViewModel"
-             x:Name="page"
-             Title="Sign in">
+             Shell.PresentationMode="ModalAnimated">
 
-    <ContentPage.Behaviors>
-        <toolkit:EventToCommandBehavior EventName="Appearing"
-                                        BindingContext="{Binding BindingContext, Source={x:Reference page}, x:DataType=ContentPage}"
-                                        Command="{Binding LoadCommand}" />
-    </ContentPage.Behaviors>
+    <Shell.BackButtonBehavior>
+        <BackButtonBehavior IsEnabled="False" IsVisible="False" />
+    </Shell.BackButtonBehavior>
 
     <ContentPage.Resources>
         <toolkit:IsStringNotNullOrEmptyConverter x:Key="IsNotEmpty" />
@@ -24,6 +21,7 @@
             Padding="30,0"
             Spacing="25">
 
+            <Label Text="Sign in" Style="{StaticResource Headline}" />
             <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
             <Label Text="{Binding Prompt}" IsVisible="{Binding IsReady}" />
 

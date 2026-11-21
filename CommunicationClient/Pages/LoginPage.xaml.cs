@@ -9,4 +9,10 @@ public partial class LoginPage : ContentPage
         InitializeComponent();
         BindingContext = viewModel;
     }
+
+    protected override bool OnBackButtonPressed()
+    {
+        Platform.CurrentActivity?.MoveTaskToBack(true);
+        return true;
+    }
 }

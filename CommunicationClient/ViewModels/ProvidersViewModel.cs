@@ -42,6 +42,12 @@ public partial class ProvidersViewModel(ICommunicationApi api, INavigationServic
     [RelayCommand]
     private async Task Load()
     {
+        if (!await session.IsLoggedIn())
+        {
+            await navigation.GoTo(nameof(LoginPage));
+            return;
+        }
+
         Status = "Loading...";
         var response = await api.GetProviders();
         if (!response.IsSuccessfulWithContent)

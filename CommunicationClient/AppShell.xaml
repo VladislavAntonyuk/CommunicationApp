@@ -8,10 +8,6 @@
     FlyoutBehavior="Disabled">
 
     <ShellContent
-        ContentTemplate="{DataTemplate pages:LoginPage}"
-        Route="LoginPage" />
-
-    <ShellContent
         ContentTemplate="{DataTemplate pages:ProvidersPage}"
         Route="ProvidersPage" />
 

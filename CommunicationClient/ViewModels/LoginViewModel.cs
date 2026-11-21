@@ -1,4 +1,3 @@
-using CommunicationClient.Pages;
 using CommunicationClient.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -24,7 +23,7 @@ public partial class LoginViewModel(IAuthApi auth, AuthSession session, INavigat
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsReady), nameof(AsksForPhone), nameof(AsksForCode))]
     [NotifyCanExecuteChangedFor(nameof(SendCodeCommand), nameof(LogInCommand), nameof(ChangeNumberCommand))]
-    public partial bool IsBusy { get; set; } = true;
+    public partial bool IsBusy { get; set; }
 
     public bool IsReady => !IsBusy;
 
@@ -35,18 +34,6 @@ public partial class LoginViewModel(IAuthApi auth, AuthSession session, INavigat
     public string Prompt => SentTo == null
         ? "Your phone number. We will send a login code to it by SMS."
         : $"Code sent by SMS to {SentTo}";
-
-    [RelayCommand]
-    private async Task Load()
-    {
-        if (await session.IsLoggedIn())
-        {
-            await navigation.GoTo($"//{nameof(ProvidersPage)}");
-            return;
-        }
-
-        IsBusy = false;
-    }
 
     [RelayCommand(CanExecute = nameof(CanSend))]
     private async Task SendCode()
@@ -88,7 +75,7 @@ public partial class LoginViewModel(IAuthApi auth, AuthSession session, INavigat
             await session.LogIn(response.Content);
             SentTo = null;
             Code = "";
-            await navigation.GoTo($"//{nameof(ProvidersPage)}");
+            await navigation.GoBack();
         });
     }
 

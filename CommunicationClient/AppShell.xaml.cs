@@ -8,6 +8,6 @@ public partial class AppShell : Shell
     public AppShell(AuthSession session)
     {
         InitializeComponent();
-        session.LoggedOut += () => MainThread.BeginInvokeOnMainThread(async () => await GoToAsync($"//{nameof(LoginPage)}"));
+        session.LoggedOut += () => MainThread.BeginInvokeOnMainThread(async () => await GoToAsync($"//{nameof(ProvidersPage)}/{nameof(LoginPage)}"));
     }
 }

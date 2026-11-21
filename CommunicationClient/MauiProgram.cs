@@ -30,8 +30,15 @@ public static class MauiProgram
         }
 
         var backend = new Uri(builder.Configuration["Backend"]!);
-        builder.Services.AddRefitGeneratedClient<ICommunicationApi>()
+        builder.Services.AddSingleton(SecureStorage.Default);
+        builder.Services.AddSingleton<ITokenStorage, SecureTokenStorage>();
+        builder.Services.AddSingleton<AuthSession>();
+        builder.Services.AddTransient<AuthHandler>();
+        builder.Services.AddRefitGeneratedClient<IAuthApi>()
             .ConfigureHttpClient(client => client.BaseAddress = backend);
+        builder.Services.AddRefitGeneratedClient<ICommunicationApi>()
+            .ConfigureHttpClient(client => client.BaseAddress = backend)
+            .AddHttpMessageHandler<AuthHandler>();
         builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
         builder.Services.AddSingleton<IDialogService, ShellDialogService>();
         builder.Services.AddTransient<ProvidersPage, ProvidersViewModel>();

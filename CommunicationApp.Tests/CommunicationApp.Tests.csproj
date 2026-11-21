@@ -32,6 +32,7 @@
     <Compile Include="..\CommunicationClient\Services\ITokenStorage.cs" Link="Client\ITokenStorage.cs" />
     <Compile Include="..\CommunicationClient\Services\AuthSession.cs" Link="Client\AuthSession.cs" />
     <Compile Include="..\CommunicationClient\Services\AuthHandler.cs" Link="Client\AuthHandler.cs" />
+    <Compile Include="..\CommunicationClient\Services\ApiErrorExtensions.cs" Link="Client\ApiErrorExtensions.cs" />
     <None Include="..\CommunicationApp.AppHost\mosquitto\mosquitto.conf" Link="mosquitto.conf" CopyToOutputDirectory="PreserveNewest" />
     <None Include="mosquitto.passwd" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

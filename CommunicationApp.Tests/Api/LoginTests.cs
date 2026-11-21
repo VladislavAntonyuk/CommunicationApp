@@ -76,7 +76,18 @@ public sealed class LoginTests : ApiTest
     }
 
     [Fact]
-    public async Task NewCode_DoesNotResetWrongAttempts()
+    public async Task ParallelWrongCodes_AreAllCounted()
+    {
+        var code = await RequestCode();
+
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Login(PhoneNumber, WrongCode(code))));
+
+        Assert.Equal(5, (await InDb(db => db.LoginCodes.SingleAsync(Token))).FailedAttempts);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await Login(PhoneNumber, code)).StatusCode);
+    }
+
+    [Fact]
+    public async Task NewCode_AllowsNewAttempts()
     {
         var first = await RequestCode();
         for (var i = 0; i < 5; i++)
@@ -85,7 +96,7 @@ public sealed class LoginTests : ApiTest
 
         var response = await Login(PhoneNumber, await RequestCode());
 
-        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        response.EnsureSuccessStatusCode();
     }
 
     [Fact]

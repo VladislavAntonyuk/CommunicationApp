@@ -12,5 +12,5 @@ public class AuthSettings
 
     public required int MaxCodesPerHour { get; set; }
 
-    public required int MaxFailedAttemptsPerHour { get; set; }
+    public required int MaxAttemptsPerCode { get; set; }
 }

@@ -14,6 +14,8 @@ public abstract record SendCodeResult
 
     public sealed record InvalidNumber : SendCodeResult;
 
+    public sealed record NotAllowed : SendCodeResult;
+
     public sealed record TooSoon(TimeSpan RetryAfter) : SendCodeResult;
 }
 
@@ -26,7 +28,7 @@ public abstract record CheckCodeResult
     public sealed record TooManyAttempts : CheckCodeResult;
 }
 
-public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<AuthSettings> options)
+public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<AuthSettings> options, IOptions<ClientSettings> client)
 {
     private static readonly TimeSpan LimitWindow = TimeSpan.FromHours(1);
     private static readonly PasswordHasher<LoginCode> Hasher = new();
@@ -37,6 +39,9 @@ public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPubli
         var phoneNumber = PhoneNumberNormalizer.ToE164(input, settings.DefaultRegion, settings.AllowedRegions);
         if (phoneNumber == null)
             return new SendCodeResult.InvalidNumber();
+
+        if (!PhoneNumberMatcher.IsSameNumber(phoneNumber, client.Value.PhoneNumber))
+            return new SendCodeResult.NotAllowed();
 
         var now = DateTime.UtcNow;
         var since = now - LimitWindow;
@@ -73,28 +78,26 @@ public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPubli
             return new CheckCodeResult.Invalid("Wrong phone number or code");
 
         var now = DateTime.UtcNow;
-        var since = now - LimitWindow;
-        var recent = await dbContext.LoginCodes
-            .AsTracking()
-            .Where(x => x.PhoneNumber == phoneNumber && x.CreatedAt > since)
-            .OrderBy(x => x.CreatedAt)
-            .ToListAsync();
+        var latest = await dbContext.LoginCodes
+            .Where(x => x.PhoneNumber == phoneNumber)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync();
 
-        if (recent.Sum(x => x.FailedAttempts) >= settings.MaxFailedAttemptsPerHour)
-            return new CheckCodeResult.TooManyAttempts();
-
-        var latest = recent.LastOrDefault();
         if (latest == null || now - latest.CreatedAt > settings.CodeLifetime)
             return new CheckCodeResult.Invalid("Code expired, request a new one");
 
-        if (Hasher.VerifyHashedPassword(latest, latest.CodeHash, code.Trim()) == PasswordVerificationResult.Failed)
-        {
-            latest.FailedAttempts++;
-            await dbContext.SaveChangesAsync();
-            return new CheckCodeResult.Invalid("Wrong phone number or code");
-        }
+        var counted = await dbContext.LoginCodes
+            .Where(x => x.Id == latest.Id && x.FailedAttempts < settings.MaxAttemptsPerCode)
+            .ExecuteUpdateAsync(x => x.SetProperty(c => c.FailedAttempts, c => c.FailedAttempts + 1));
+        if (counted == 0)
+            return new CheckCodeResult.TooManyAttempts();
 
-        dbContext.LoginCodes.Remove(latest);
+        if (Hasher.VerifyHashedPassword(latest, latest.CodeHash, code.Trim()) == PasswordVerificationResult.Failed)
+            return new CheckCodeResult.Invalid("Wrong phone number or code");
+
+        if (await dbContext.LoginCodes.Where(x => x.Id == latest.Id).ExecuteDeleteAsync() == 0)
+            return new CheckCodeResult.Invalid("Code expired, request a new one");
+
         var user = await dbContext.Users.AsTracking().FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
         if (user == null)
         {

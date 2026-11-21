@@ -90,6 +90,8 @@ app.MapPost("/auth/code", async (LoginCodeService codes, HttpResponse response, 
             case SendCodeResult.TooSoon tooSoon:
                 response.Headers.RetryAfter = ((int)Math.Ceiling(tooSoon.RetryAfter.TotalSeconds)).ToString();
                 return Results.Problem("Too many codes requested, try again later", statusCode: StatusCodes.Status429TooManyRequests);
+            case SendCodeResult.NotAllowed:
+                return Results.Problem("This phone number can't sign in", statusCode: StatusCodes.Status403Forbidden);
             default:
                 return Results.Problem("Invalid phone number", statusCode: StatusCodes.Status400BadRequest);
         }
@@ -99,7 +101,7 @@ app.MapPost("/auth/login", async (LoginCodeService codes, LoginRequest request) 
         await codes.CheckCode(request.PhoneNumber, request.Code) switch
         {
             CheckCodeResult.Valid valid => Results.SignIn(UserPrincipal.Create(valid.User), authenticationScheme: BearerTokenDefaults.AuthenticationScheme),
-            CheckCodeResult.TooManyAttempts => Results.Problem("Too many wrong codes, try again later", statusCode: StatusCodes.Status429TooManyRequests),
+            CheckCodeResult.TooManyAttempts => Results.Problem("Too many wrong codes, request a new one", statusCode: StatusCodes.Status429TooManyRequests),
             CheckCodeResult.Invalid invalid => Results.Problem(invalid.Reason, statusCode: StatusCodes.Status400BadRequest),
             _ => throw new InvalidOperationException()
         })

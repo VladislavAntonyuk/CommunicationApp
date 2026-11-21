@@ -1,8 +1,5 @@
-using Microsoft.EntityFrameworkCore;
-
 namespace CommunicationApi.Database;
 
-[Index(nameof(PhoneNumber), nameof(CreatedAt))]
 public class LoginCode
 {
     public int Id { get; set; }

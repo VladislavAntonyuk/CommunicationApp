@@ -11,16 +11,18 @@ public sealed class IncomingSmsWorker(Context context, WorkerParameters paramete
 {
     private const string WorkName = "incoming-sms";
     private const string IdKey = "id";
+    private const string FromKey = "from";
     private const string TextKey = "text";
     private static readonly TimeSpan PublishTimeout = TimeSpan.FromSeconds(30);
 
     private readonly CancellationTokenSource _stopped = new();
 
-    public static void Enqueue(Context context, string text)
+    public static void Enqueue(Context context, string from, string text)
     {
         var request = new OneTimeWorkRequest.Builder(Java.Lang.Class.FromType(typeof(IncomingSmsWorker)))
             .SetInputData(new Data.Builder()
                 .PutString(IdKey, Guid.NewGuid().ToString("N"))!
+                .PutString(FromKey, from)!
                 .PutString(TextKey, text)!
                 .Build())
             .SetConstraints(new Constraints.Builder()
@@ -35,8 +37,9 @@ public sealed class IncomingSmsWorker(Context context, WorkerParameters paramete
     public override Result DoWork()
     {
         var id = InputData!.GetString(IdKey);
+        var from = InputData.GetString(FromKey);
         var text = InputData.GetString(TextKey);
-        if (id == null || text == null)
+        if (id == null || from == null || text == null)
             return Result.InvokeFailure()!;
 
         try
@@ -44,7 +47,7 @@ public sealed class IncomingSmsWorker(Context context, WorkerParameters paramete
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stopped.Token);
             timeout.CancelAfter(PublishTimeout);
             var forwarder = IPlatformApplication.Current!.Services.GetRequiredService<IncomingSmsForwarder>();
-            forwarder.Forward(text, id, timeout.Token).GetAwaiter().GetResult();
+            forwarder.Forward(from, text, id, timeout.Token).GetAwaiter().GetResult();
             return Result.InvokeSuccess()!;
         }
         catch (Exception ex)

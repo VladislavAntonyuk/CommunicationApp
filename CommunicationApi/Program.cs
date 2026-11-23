@@ -1,11 +1,14 @@
 using CommunicationApi.Database;
 using CommunicationApi.Services;
+using CommunicationApi.Services.Auth;
 using CommunicationApi.Services.Email;
 using CommunicationApi.Services.Messaging;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
 using CommunicationApi.Services.Telegram;
+using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Shared;
 using Shared.Api;
 using Silverback.Configuration;
@@ -24,6 +27,11 @@ builder.Services.Configure<HostOptions>(opts =>
 builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"));
+builder.Services.Configure<ClientSettings>(builder.Configuration.GetSection("Client"));
+builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection("Auth"));
+builder.Services.AddScoped<LoginCodeService>();
+builder.Services.AddAuthentication(BearerTokenDefaults.AuthenticationScheme).AddBearerToken();
+builder.Services.AddAuthorization();
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
 builder.Services.AddSilverback()
     .WithConnectionToMessageBroker(options => options.AddMqtt().ConnectAfterStartup().RetryOnConnectionFailure())
@@ -54,7 +62,7 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, Target target, Shared.Api.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<ClientSettings> client, Target target, Shared.Api.Message request) =>
 {
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;
@@ -70,10 +78,51 @@ app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPub
     dbContext.OutgoingMessages.Add(new OutgoingMessage { Id = id, CreatedAt = DateTime.UtcNow });
     await dbContext.SaveChangesAsync();
 
-    await publisher.PublishAsync(new OutgoingSms(request.Text, id));
+    await publisher.PublishAsync(new OutgoingSms(client.Value.PhoneNumber, request.Text, id));
 }).WithDescription("Service sends webhooks on this endpoint.");
 
-app.MapGet("/providers",
+app.MapPost("/auth/code", async (LoginCodeService codes, HttpResponse response, LoginPhone request) =>
+    {
+        switch (await codes.SendCode(request.PhoneNumber))
+        {
+            case SendCodeResult.Sent sent:
+                return Results.Ok(new LoginPhone(sent.PhoneNumber));
+            case SendCodeResult.TooSoon tooSoon:
+                response.Headers.RetryAfter = ((int)Math.Ceiling(tooSoon.RetryAfter.TotalSeconds)).ToString();
+                return Results.Problem("Too many codes requested, try again later", statusCode: StatusCodes.Status429TooManyRequests);
+            case SendCodeResult.NotAllowed:
+                return Results.Problem("This phone number can't sign in", statusCode: StatusCodes.Status403Forbidden);
+            default:
+                return Results.Problem("Invalid phone number", statusCode: StatusCodes.Status400BadRequest);
+        }
+    }).WithDescription("Sends a login code by SMS to the phone number.");
+
+app.MapPost("/auth/login", async (LoginCodeService codes, LoginRequest request) =>
+        await codes.CheckCode(request.PhoneNumber, request.Code) switch
+        {
+            CheckCodeResult.Valid valid => Results.SignIn(UserPrincipal.Create(valid.User), authenticationScheme: BearerTokenDefaults.AuthenticationScheme),
+            CheckCodeResult.TooManyAttempts => Results.Problem("Too many wrong codes, request a new one", statusCode: StatusCodes.Status429TooManyRequests),
+            CheckCodeResult.Invalid invalid => Results.Problem(invalid.Reason, statusCode: StatusCodes.Status400BadRequest),
+            _ => throw new InvalidOperationException()
+        })
+    .WithDescription("Checks the login code and returns access and refresh tokens.");
+
+app.MapPost("/auth/refresh", async (IOptionsMonitor<BearerTokenOptions> bearerOptions, CommunicationApiDbContext dbContext, RefreshRequest request) =>
+    {
+        var ticket = bearerOptions.Get(BearerTokenDefaults.AuthenticationScheme).RefreshTokenProtector.Unprotect(request.RefreshToken);
+        if (ticket?.Properties.ExpiresUtc is not { } expiresUtc || DateTimeOffset.UtcNow >= expiresUtc || UserPrincipal.UserId(ticket.Principal) is not { } userId)
+            return Results.Challenge();
+
+        var user = await dbContext.Users.FindAsync(userId);
+        return user == null
+            ? Results.Challenge()
+            : Results.SignIn(UserPrincipal.Create(user), authenticationScheme: BearerTokenDefaults.AuthenticationScheme);
+    })
+    .WithDescription("Exchanges a refresh token for new access and refresh tokens.");
+
+var protectedApi = app.MapGroup("").RequireAuthorization();
+
+protectedApi.MapGet("/providers",
     async (CommunicationApiDbContext dbContext, IConfiguration configuration) =>
     {
         var disabled = await dbContext.ProviderSettings
@@ -85,7 +134,7 @@ app.MapGet("/providers",
             new ProviderStatus(x, !disabled.Contains(x), ReceivingProviders.IsConfigured(x, configuration)));
     }).WithDescription("Providers that can receive messages, and whether receiving is switched on for each.");
 
-app.MapPut("/providers/{target}",
+protectedApi.MapPut("/providers/{target}",
     async (CommunicationApiDbContext dbContext, Target target, ProviderSwitch request) =>
     {
         if (!ReceivingProviders.All.Contains(target))
@@ -101,7 +150,7 @@ app.MapPut("/providers/{target}",
         return Results.Ok();
     }).WithDescription("Switches receiving from a provider on or off.");
 
-app.MapGet("/providers/{target}/chats",
+protectedApi.MapGet("/providers/{target}/chats",
     async (CommunicationApiDbContext dbContext, ITelegramService telegramService, ILogger<Program> logger, Target target) =>
     {
         if (target != Target.Telegram)
@@ -124,7 +173,7 @@ app.MapGet("/providers/{target}/chats",
         }
     }).WithDescription("Chats of a provider, and whether messages from each are received.");
 
-app.MapPut("/providers/{target}/chats/{chatId}",
+protectedApi.MapPut("/providers/{target}/chats/{chatId}",
     async (CommunicationApiDbContext dbContext, Target target, string chatId, ProviderSwitch request) =>
     {
         if (target != Target.Telegram)
@@ -140,16 +189,16 @@ app.MapPut("/providers/{target}/chats/{chatId}",
         return Results.Ok();
     }).WithDescription("Switches receiving from one chat on or off.");
 
-app.MapGet("/telegram/login", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.GetStatus, logger))
+protectedApi.MapGet("/telegram/login", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.GetStatus, logger))
     .WithDescription("What is needed next to log in to Telegram: the phone, the code, the password, or nothing.");
 
-app.MapPost("/telegram/login", (ITelegramLogin login, ILogger<Program> logger, TelegramLoginValue request) =>
+protectedApi.MapPost("/telegram/login", (ITelegramLogin login, ILogger<Program> logger, TelegramLoginValue request) =>
         string.IsNullOrWhiteSpace(request.Value)
             ? Task.FromResult(Results.Problem("Value is required", statusCode: StatusCodes.Status400BadRequest))
             : TelegramLoginResult(() => login.Submit(request.Value), logger))
     .WithDescription("Takes the value the login is waiting for and returns what is needed next.");
 
-app.MapPost("/telegram/logout", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.Logout, logger))
+protectedApi.MapPost("/telegram/logout", (ITelegramLogin login, ILogger<Program> logger) => TelegramLoginResult(login.Logout, logger))
     .WithDescription("Logs out of Telegram, or abandons a login that is waiting for a code or password.");
 
 using var scope = app.Services.CreateScope();

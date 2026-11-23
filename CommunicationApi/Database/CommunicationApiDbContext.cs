@@ -8,4 +8,12 @@ public class CommunicationApiDbContext(DbContextOptions<CommunicationApiDbContex
     public DbSet<ChatSetting> ChatSettings => Set<ChatSetting>();
     public DbSet<OutgoingMessage> OutgoingMessages => Set<OutgoingMessage>();
     public DbSet<IncomingMessage> IncomingMessages => Set<IncomingMessage>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<LoginCode> LoginCodes => Set<LoginCode>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(CommunicationApiDbContext).Assembly);
+        base.OnModelCreating(modelBuilder);
+    }
 }

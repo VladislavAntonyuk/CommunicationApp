@@ -6,7 +6,7 @@ namespace CommunicationApp.Services;
 
 public sealed class IncomingSmsForwarder(IProducerCollection producers, IOptions<MqttSettings> options)
 {
-    public async Task Forward(string text, string id, CancellationToken token) =>
+    public async Task Forward(string from, string text, string id, CancellationToken token) =>
         await producers.GetProducerForEndpoint(options.Value.IncomingTopic)
-            .ProduceAsync(new IncomingSms(text, id), cancellationToken: token);
+            .ProduceAsync(new IncomingSms(from, text, id), cancellationToken: token);
 }

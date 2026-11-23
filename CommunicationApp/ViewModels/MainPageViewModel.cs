@@ -12,15 +12,10 @@ public partial class MainPageViewModel(
     INotifier notifier) : ObservableObject
 {
     [ObservableProperty]
-    public partial string PhoneNumber { get; set; } = preferences.Get("from", "");
-
-    [ObservableProperty]
     public partial bool AutoForward { get; set; } = preferences.Get("autoForward", false);
 
     [ObservableProperty]
     public partial string Status { get; set; } = status.Text;
-
-    partial void OnPhoneNumberChanged(string value) => preferences.Set("from", value);
 
     [RelayCommand]
     private void Appearing()
@@ -60,12 +55,6 @@ public partial class MainPageViewModel(
 
     private async Task<bool> EnsureReadyToForward()
     {
-        if (string.IsNullOrWhiteSpace(PhoneNumber))
-        {
-            await notifier.Show("Enter a phone number");
-            return false;
-        }
-
         if (!await permissions.RequestReceive())
         {
             await notifier.Show("SMS permission is required");

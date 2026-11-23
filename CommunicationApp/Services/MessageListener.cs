@@ -54,7 +54,7 @@ public sealed class MessageListener(
         SmsAck ack;
         try
         {
-            await handler.Handle(envelope.Message!.Text);
+            await handler.Handle(envelope.Message!.To, envelope.Message.Text);
             ack = new SmsAck(true);
         }
         catch (TimeoutException ex)

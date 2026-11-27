@@ -1,4 +1,6 @@
 using CommunicationApi.Database;
+using CommunicationApi.Services.Auth;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Shared;
 using Silverback.Messaging.Messages;
@@ -8,7 +10,7 @@ namespace CommunicationApi.Services.Messaging;
 public class IncomingSmsSubscriber(
     CommunicationApiDbContext dbContext,
     IncomingSmsRouter router,
-    IOptions<ClientSettings> client,
+    IOptions<AuthSettings> auth,
     ILogger<IncomingSmsSubscriber> logger)
 {
     public async Task HandleAsync(IInboundEnvelope<IncomingSms> envelope)
@@ -19,7 +21,8 @@ public class IncomingSmsSubscriber(
             return;
         }
 
-        if (!PhoneNumberMatcher.IsSameNumber(sms.From, client.Value.PhoneNumber))
+        var from = PhoneNumberNormalizer.ToE164(sms.From, auth.Value.DefaultRegion, auth.Value.AllowedRegions);
+        if (from == null || !await dbContext.Users.AnyAsync(x => x.PhoneNumber == from))
         {
             logger.LogWarning("Incoming SMS {Id} from an unknown number was ignored", id);
             return;

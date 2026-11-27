@@ -14,8 +14,6 @@ public abstract record SendCodeResult
 
     public sealed record InvalidNumber : SendCodeResult;
 
-    public sealed record NotAllowed : SendCodeResult;
-
     public sealed record TooSoon(TimeSpan RetryAfter) : SendCodeResult;
 }
 
@@ -28,7 +26,7 @@ public abstract record CheckCodeResult
     public sealed record TooManyAttempts : CheckCodeResult;
 }
 
-public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<AuthSettings> options, IOptions<ClientSettings> client)
+public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<AuthSettings> options)
 {
     private static readonly TimeSpan LimitWindow = TimeSpan.FromHours(1);
     private static readonly PasswordHasher<LoginCode> Hasher = new();
@@ -39,9 +37,6 @@ public sealed class LoginCodeService(CommunicationApiDbContext dbContext, IPubli
         var phoneNumber = PhoneNumberNormalizer.ToE164(input, settings.DefaultRegion, settings.AllowedRegions);
         if (phoneNumber == null)
             return new SendCodeResult.InvalidNumber();
-
-        if (!PhoneNumberMatcher.IsSameNumber(phoneNumber, client.Value.PhoneNumber))
-            return new SendCodeResult.NotAllowed();
 
         var now = DateTime.UtcNow;
         var since = now - LimitWindow;

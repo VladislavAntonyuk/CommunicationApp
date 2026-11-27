@@ -55,15 +55,19 @@ public sealed class AuthorizationTests : ApiTest
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    [Theory]
-    [InlineData("/")]
-    [InlineData("/notify/Telegram")]
-    public async Task OpenEndpoints_WorkWithoutToken(string path)
+    [Fact]
+    public async Task Root_WorksWithoutToken()
     {
-        var response = path == "/"
-            ? await AnonymousClient.GetAsync(path, Token)
-            : await AnonymousClient.PostAsJsonAsync(path, new Message("Telegram|1|hello"), Token);
+        var response = await AnonymousClient.GetAsync("/", Token);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Notify_IsGone()
+    {
+        var response = await AnonymousClient.PostAsJsonAsync("/notify/Telegram", new Message("Telegram|1|hello"), Token);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

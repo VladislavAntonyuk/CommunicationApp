@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using CommunicationApi.Database;
@@ -36,12 +35,10 @@ public sealed class BrokerTests(MosquittoFixture mosquitto) : IClassFixture<Mosq
             .WithTopicFilter(f => f.WithTopic(factory.Topic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
             .Build(), token);
 
-        TestTokens.SaveUser(factory.Services);
-        var response = await factory.CreateClient().PostAsJsonAsync("/notify/Teams", new Message("Teams|1|hello"), token);
+        await factory.SendSms(new Message("Telegram|1|hello"));
 
-        response.EnsureSuccessStatusCode();
         var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
-        Assert.Equal(new OutgoingSms(ApiFactory.ClientPhoneNumber, "Teams|1|hello"), JsonSerializer.Deserialize<OutgoingSms>(message.ConvertPayloadToString()));
+        Assert.Equal(new OutgoingSms(ApiFactory.ClientPhoneNumber, "Telegram|1|hello"), JsonSerializer.Deserialize<OutgoingSms>(message.ConvertPayloadToString()));
         Assert.Matches("^[0-9a-f]{32}$", Encoding.UTF8.GetString(message.CorrelationData));
         Assert.Equal(factory.AckTopic, message.ResponseTopic);
         Assert.InRange(message.MessageExpiryInterval, 3590u, 3600u);
@@ -52,9 +49,7 @@ public sealed class BrokerTests(MosquittoFixture mosquitto) : IClassFixture<Mosq
     {
         var token = TestContext.Current.CancellationToken;
         await using var factory = new BrokerApiFactory(mosquitto.Broker.ToString());
-        TestTokens.SaveUser(factory.Services);
-        var response = await factory.CreateClient().PostAsJsonAsync("/notify/Telegram", new Message("Telegram|1|hello"), token);
-        response.EnsureSuccessStatusCode();
+        await factory.SendSms(new Message("Telegram|1|hello"));
         var id = (await Messages(factory)).Single().Id;
         using var gateway = new MqttClientFactory().CreateMqttClient();
         await gateway.ConnectAsync(new MqttClientOptionsBuilder()

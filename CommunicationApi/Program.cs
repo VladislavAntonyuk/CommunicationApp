@@ -25,7 +25,6 @@ builder.Services.Configure<HostOptions>(opts =>
 builder.Services.Configure<SlackSettings>(builder.Configuration.GetSection("Slack"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"));
-builder.Services.Configure<ClientSettings>(builder.Configuration.GetSection("Client"));
 builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection("Auth"));
 builder.Services.AddScoped<LoginCodeService>();
 builder.Services.AddHttpContextAccessor();
@@ -45,7 +44,6 @@ builder.Services.AddScoped<ISlackService, SlackService>();
 builder.Services.AddScoped<ITeamsService, TeamsService>();
 builder.Services.AddScoped<IncomingSmsRouter>();
 builder.Services.AddHostedService<TelegramBackgroundService>();
-builder.Services.AddHostedService<SlackBackgroundService>();
 builder.Services.AddScoped<OutgoingSmsSender>();
 builder.Services.AddSingleton<TelegramLogins>();
 builder.Services.AddScoped<ITelegramLogin>(sp => sp.GetRequiredService<TelegramLogins>().For(sp.GetRequiredService<ICurrentUser>().RequiredId));
@@ -63,15 +61,6 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, OutgoingSmsSender sender, IOptions<ClientSettings> client, ICurrentUser currentUser, Target target, Shared.Api.Message request) =>
-{
-    if (await dbContext.Users.FirstOrDefaultAsync(x => x.PhoneNumber == client.Value.PhoneNumber) is not { } owner)
-        return;
-
-    currentUser.Set(owner.Id);
-    await sender.Send(target, request);
-}).WithDescription("Service sends webhooks on this endpoint.");
-
 app.MapPost("/auth/code", async (LoginCodeService codes, HttpResponse response, LoginPhone request) =>
     {
         switch (await codes.SendCode(request.PhoneNumber))
@@ -81,8 +70,6 @@ app.MapPost("/auth/code", async (LoginCodeService codes, HttpResponse response, 
             case SendCodeResult.TooSoon tooSoon:
                 response.Headers.RetryAfter = ((int)Math.Ceiling(tooSoon.RetryAfter.TotalSeconds)).ToString();
                 return Results.Problem("Too many codes requested, try again later", statusCode: StatusCodes.Status429TooManyRequests);
-            case SendCodeResult.NotAllowed:
-                return Results.Problem("This phone number can't sign in", statusCode: StatusCodes.Status403Forbidden);
             default:
                 return Results.Problem("Invalid phone number", statusCode: StatusCodes.Status400BadRequest);
         }

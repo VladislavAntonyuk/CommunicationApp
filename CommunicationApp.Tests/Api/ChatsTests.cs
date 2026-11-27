@@ -84,7 +84,7 @@ public sealed class ChatsTests : ApiTest
     {
         await Put("3", true);
 
-        await Client.PostAsJsonAsync("/notify/Telegram", new Message("Telegram|3|hello", "3", ChatKind.Channel), TestContext.Current.CancellationToken);
+        await Factory.SendSms(new Message("Telegram|3|hello", "3", ChatKind.Channel));
 
         Assert.Equal(new[] { "Telegram|3|hello" }, Factory.Publisher.Published);
     }

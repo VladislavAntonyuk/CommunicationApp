@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using CommunicationApi.Database;
 using CommunicationApi.Services;
 using CommunicationApi.Services.Auth;
@@ -31,6 +30,8 @@ builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"
 builder.Services.Configure<ClientSettings>(builder.Configuration.GetSection("Client"));
 builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection("Auth"));
 builder.Services.AddScoped<LoginCodeService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddAuthentication(BearerTokenDefaults.AuthenticationScheme).AddBearerToken();
 builder.Services.AddAuthorization();
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
@@ -63,8 +64,11 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<ClientSettings> client, Target target, Shared.Api.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<ClientSettings> client, ICurrentUser currentUser, Target target, Shared.Api.Message request) =>
 {
+    if (await dbContext.Users.FirstOrDefaultAsync(x => x.PhoneNumber == client.Value.PhoneNumber) is { } owner)
+        currentUser.Set(owner.Id);
+
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;
 
@@ -124,11 +128,10 @@ app.MapPost("/auth/refresh", async (IOptionsMonitor<BearerTokenOptions> bearerOp
 var protectedApi = app.MapGroup("").RequireAuthorization();
 
 protectedApi.MapGet("/providers",
-    async (CommunicationApiDbContext dbContext, IConfiguration configuration, ClaimsPrincipal user) =>
+    async (CommunicationApiDbContext dbContext, IConfiguration configuration) =>
     {
-        var userId = UserPrincipal.RequiredUserId(user);
         var disabled = await dbContext.ProviderSettings
-            .Where(x => x.UserId == userId && !x.Enabled)
+            .Where(x => !x.Enabled)
             .Select(x => x.Target)
             .ToListAsync();
 
@@ -137,15 +140,14 @@ protectedApi.MapGet("/providers",
     }).WithDescription("Providers that can receive messages, and whether receiving is switched on for each.");
 
 protectedApi.MapPut("/providers/{target}",
-    async (CommunicationApiDbContext dbContext, ClaimsPrincipal user, Target target, ProviderSwitch request) =>
+    async (CommunicationApiDbContext dbContext, ICurrentUser currentUser, Target target, ProviderSwitch request) =>
     {
         if (!ReceivingProviders.All.Contains(target))
             return Results.Problem($"{target} does not receive messages", statusCode: StatusCodes.Status400BadRequest);
 
-        var userId = UserPrincipal.RequiredUserId(user);
-        var setting = await dbContext.ProviderSettings.AsTracking().FirstOrDefaultAsync(x => x.UserId == userId && x.Target == target);
+        var setting = await dbContext.ProviderSettings.AsTracking().FirstOrDefaultAsync(x => x.Target == target);
         if (setting == null)
-            dbContext.ProviderSettings.Add(new ProviderSetting { UserId = userId, Target = target, Enabled = request.Enabled });
+            dbContext.ProviderSettings.Add(new ProviderSetting { UserId = currentUser.RequiredId, Target = target, Enabled = request.Enabled });
         else
             setting.Enabled = request.Enabled;
 
@@ -154,17 +156,16 @@ protectedApi.MapPut("/providers/{target}",
     }).WithDescription("Switches receiving from a provider on or off.");
 
 protectedApi.MapGet("/providers/{target}/chats",
-    async (CommunicationApiDbContext dbContext, ITelegramService telegramService, ILogger<Program> logger, ClaimsPrincipal user, Target target) =>
+    async (CommunicationApiDbContext dbContext, ITelegramService telegramService, ILogger<Program> logger, Target target) =>
     {
         if (target != Target.Telegram)
             return Results.Problem($"Chats cannot be chosen for {target}", statusCode: StatusCodes.Status400BadRequest);
 
-        var userId = UserPrincipal.RequiredUserId(user);
         try
         {
             var chats = await telegramService.GetChats();
             var saved = await dbContext.ChatSettings
-                .Where(x => x.UserId == userId && x.Target == target)
+                .Where(x => x.Target == target)
                 .ToDictionaryAsync(x => x.ChatId, x => x.Enabled);
 
             return Results.Ok(chats.Select(x =>
@@ -178,15 +179,14 @@ protectedApi.MapGet("/providers/{target}/chats",
     }).WithDescription("Chats of a provider, and whether messages from each are received.");
 
 protectedApi.MapPut("/providers/{target}/chats/{chatId}",
-    async (CommunicationApiDbContext dbContext, ClaimsPrincipal user, Target target, string chatId, ProviderSwitch request) =>
+    async (CommunicationApiDbContext dbContext, ICurrentUser currentUser, Target target, string chatId, ProviderSwitch request) =>
     {
         if (target != Target.Telegram)
             return Results.Problem($"Chats cannot be chosen for {target}", statusCode: StatusCodes.Status400BadRequest);
 
-        var userId = UserPrincipal.RequiredUserId(user);
-        var setting = await dbContext.ChatSettings.AsTracking().FirstOrDefaultAsync(x => x.UserId == userId && x.Target == target && x.ChatId == chatId);
+        var setting = await dbContext.ChatSettings.AsTracking().FirstOrDefaultAsync(x => x.Target == target && x.ChatId == chatId);
         if (setting == null)
-            dbContext.ChatSettings.Add(new ChatSetting { UserId = userId, Target = target, ChatId = chatId, Enabled = request.Enabled });
+            dbContext.ChatSettings.Add(new ChatSetting { UserId = currentUser.RequiredId, Target = target, ChatId = chatId, Enabled = request.Enabled });
         else
             setting.Enabled = request.Enabled;
 

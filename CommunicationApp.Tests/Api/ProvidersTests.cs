@@ -56,6 +56,28 @@ public sealed class ProvidersTests : ApiTest
         Assert.False((await Get(Client)).Single(x => x.Target == Target.Slack).Enabled);
     }
 
+    [Fact]
+    public async Task Put_SwitchOff_OtherUserStillEnabled()
+    {
+        var otherUser = Factory.CreateClient().Authorized(Factory.Services, ApiFactory.OtherPhoneNumber);
+        await Put("Telegram", false);
+
+        var providers = await Get(otherUser);
+
+        Assert.True(providers.Single(x => x.Target == Target.Telegram).Enabled);
+    }
+
+    [Fact]
+    public async Task Put_OtherUserSwitchesOn_ThisUserStillDisabled()
+    {
+        var otherUser = Factory.CreateClient().Authorized(Factory.Services, ApiFactory.OtherPhoneNumber);
+        await Put("Telegram", false);
+
+        (await otherUser.PutAsJsonAsync("/providers/Telegram", new ProviderSwitch(true), TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+
+        Assert.False((await Get(Client)).Single(x => x.Target == Target.Telegram).Enabled);
+    }
+
     [Theory]
     [InlineData("Email", "Email does not receive messages")]
     [InlineData("Teams", "Teams does not receive messages")]

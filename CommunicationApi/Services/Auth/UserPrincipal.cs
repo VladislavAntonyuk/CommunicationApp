@@ -16,4 +16,7 @@ public static class UserPrincipal
 
     public static int? UserId(ClaimsPrincipal principal) =>
         int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+
+    public static int RequiredUserId(ClaimsPrincipal principal) =>
+        UserId(principal) ?? throw new InvalidOperationException("The token has no user id");
 }

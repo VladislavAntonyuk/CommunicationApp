@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CommunicationApi.Database;
 using CommunicationApi.Services;
 using CommunicationApi.Services.Auth;
@@ -123,10 +124,11 @@ app.MapPost("/auth/refresh", async (IOptionsMonitor<BearerTokenOptions> bearerOp
 var protectedApi = app.MapGroup("").RequireAuthorization();
 
 protectedApi.MapGet("/providers",
-    async (CommunicationApiDbContext dbContext, IConfiguration configuration) =>
+    async (CommunicationApiDbContext dbContext, IConfiguration configuration, ClaimsPrincipal user) =>
     {
+        var userId = UserPrincipal.RequiredUserId(user);
         var disabled = await dbContext.ProviderSettings
-            .Where(x => !x.Enabled)
+            .Where(x => x.UserId == userId && !x.Enabled)
             .Select(x => x.Target)
             .ToListAsync();
 
@@ -135,14 +137,15 @@ protectedApi.MapGet("/providers",
     }).WithDescription("Providers that can receive messages, and whether receiving is switched on for each.");
 
 protectedApi.MapPut("/providers/{target}",
-    async (CommunicationApiDbContext dbContext, Target target, ProviderSwitch request) =>
+    async (CommunicationApiDbContext dbContext, ClaimsPrincipal user, Target target, ProviderSwitch request) =>
     {
         if (!ReceivingProviders.All.Contains(target))
             return Results.Problem($"{target} does not receive messages", statusCode: StatusCodes.Status400BadRequest);
 
-        var setting = await dbContext.ProviderSettings.AsTracking().FirstOrDefaultAsync(x => x.Target == target);
+        var userId = UserPrincipal.RequiredUserId(user);
+        var setting = await dbContext.ProviderSettings.AsTracking().FirstOrDefaultAsync(x => x.UserId == userId && x.Target == target);
         if (setting == null)
-            dbContext.ProviderSettings.Add(new ProviderSetting { Target = target, Enabled = request.Enabled });
+            dbContext.ProviderSettings.Add(new ProviderSetting { UserId = userId, Target = target, Enabled = request.Enabled });
         else
             setting.Enabled = request.Enabled;
 
@@ -151,16 +154,17 @@ protectedApi.MapPut("/providers/{target}",
     }).WithDescription("Switches receiving from a provider on or off.");
 
 protectedApi.MapGet("/providers/{target}/chats",
-    async (CommunicationApiDbContext dbContext, ITelegramService telegramService, ILogger<Program> logger, Target target) =>
+    async (CommunicationApiDbContext dbContext, ITelegramService telegramService, ILogger<Program> logger, ClaimsPrincipal user, Target target) =>
     {
         if (target != Target.Telegram)
             return Results.Problem($"Chats cannot be chosen for {target}", statusCode: StatusCodes.Status400BadRequest);
 
+        var userId = UserPrincipal.RequiredUserId(user);
         try
         {
             var chats = await telegramService.GetChats();
             var saved = await dbContext.ChatSettings
-                .Where(x => x.Target == target)
+                .Where(x => x.UserId == userId && x.Target == target)
                 .ToDictionaryAsync(x => x.ChatId, x => x.Enabled);
 
             return Results.Ok(chats.Select(x =>
@@ -174,14 +178,15 @@ protectedApi.MapGet("/providers/{target}/chats",
     }).WithDescription("Chats of a provider, and whether messages from each are received.");
 
 protectedApi.MapPut("/providers/{target}/chats/{chatId}",
-    async (CommunicationApiDbContext dbContext, Target target, string chatId, ProviderSwitch request) =>
+    async (CommunicationApiDbContext dbContext, ClaimsPrincipal user, Target target, string chatId, ProviderSwitch request) =>
     {
         if (target != Target.Telegram)
             return Results.Problem($"Chats cannot be chosen for {target}", statusCode: StatusCodes.Status400BadRequest);
 
-        var setting = await dbContext.ChatSettings.AsTracking().FirstOrDefaultAsync(x => x.Target == target && x.ChatId == chatId);
+        var userId = UserPrincipal.RequiredUserId(user);
+        var setting = await dbContext.ChatSettings.AsTracking().FirstOrDefaultAsync(x => x.UserId == userId && x.Target == target && x.ChatId == chatId);
         if (setting == null)
-            dbContext.ChatSettings.Add(new ChatSetting { Target = target, ChatId = chatId, Enabled = request.Enabled });
+            dbContext.ChatSettings.Add(new ChatSetting { UserId = userId, Target = target, ChatId = chatId, Enabled = request.Enabled });
         else
             setting.Enabled = request.Enabled;
 

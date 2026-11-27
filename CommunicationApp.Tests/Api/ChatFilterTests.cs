@@ -79,9 +79,10 @@ public sealed class ChatFilterTests : ApiTest
 
     private async Task SaveChat(string chatId, bool enabled, Target target = Target.Telegram)
     {
+        var user = TestTokens.SaveUser(Factory.Services);
         using var scope = Factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>();
-        dbContext.ChatSettings.Add(new ChatSetting { Target = target, ChatId = chatId, Enabled = enabled });
+        dbContext.ChatSettings.Add(new ChatSetting { UserId = user.Id, Target = target, ChatId = chatId, Enabled = enabled });
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 

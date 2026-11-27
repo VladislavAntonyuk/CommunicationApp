@@ -19,6 +19,9 @@ namespace CommunicationApi.Database.Migrations
 
             modelBuilder.Entity("CommunicationApi.Database.ChatSetting", b =>
                 {
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Target")
                         .HasColumnType("INTEGER");
 
@@ -28,7 +31,7 @@ namespace CommunicationApi.Database.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Target", "ChatId");
+                    b.HasKey("UserId", "Target", "ChatId");
 
                     b.ToTable("ChatSettings");
                 });
@@ -100,13 +103,16 @@ namespace CommunicationApi.Database.Migrations
 
             modelBuilder.Entity("CommunicationApi.Database.ProviderSetting", b =>
                 {
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Target")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Target");
+                    b.HasKey("UserId", "Target");
 
                     b.ToTable("ProviderSettings");
                 });
@@ -130,6 +136,24 @@ namespace CommunicationApi.Database.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("CommunicationApi.Database.ChatSetting", b =>
+                {
+                    b.HasOne("CommunicationApi.Database.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CommunicationApi.Database.ProviderSetting", b =>
+                {
+                    b.HasOne("CommunicationApi.Database.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

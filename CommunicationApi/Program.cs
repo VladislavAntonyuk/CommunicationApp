@@ -9,11 +9,9 @@ using CommunicationApi.Services.Telegram;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Shared;
 using Shared.Api;
 using Silverback.Configuration;
 using Silverback.Messaging.Configuration;
-using Silverback.Messaging.Publishing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,8 +46,9 @@ builder.Services.AddScoped<ITeamsService, TeamsService>();
 builder.Services.AddScoped<IncomingSmsRouter>();
 builder.Services.AddHostedService<TelegramBackgroundService>();
 builder.Services.AddHostedService<SlackBackgroundService>();
-builder.Services.AddSingleton<TelegramLogin>();
-builder.Services.AddSingleton<ITelegramLogin>(sp => sp.GetRequiredService<TelegramLogin>());
+builder.Services.AddScoped<OutgoingSmsSender>();
+builder.Services.AddSingleton<TelegramLogins>();
+builder.Services.AddScoped<ITelegramLogin>(sp => sp.GetRequiredService<TelegramLogins>().For(sp.GetRequiredService<ICurrentUser>().RequiredId));
 
 var app = builder.Build();
 
@@ -64,26 +63,13 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<ClientSettings> client, ICurrentUser currentUser, Target target, Shared.Api.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, OutgoingSmsSender sender, IOptions<ClientSettings> client, ICurrentUser currentUser, Target target, Shared.Api.Message request) =>
 {
-    if (await dbContext.Users.FirstOrDefaultAsync(x => x.PhoneNumber == client.Value.PhoneNumber) is { } owner)
-        currentUser.Set(owner.Id);
-
-    if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
+    if (await dbContext.Users.FirstOrDefaultAsync(x => x.PhoneNumber == client.Value.PhoneNumber) is not { } owner)
         return;
 
-    if (request.ChatId != null)
-    {
-        var saved = await dbContext.ChatSettings.FirstOrDefaultAsync(x => x.Target == target && x.ChatId == request.ChatId);
-        if (!(saved?.Enabled ?? ChatDefaults.IsEnabled(request.ChatKind)))
-            return;
-    }
-
-    var id = Guid.NewGuid().ToString("N");
-    dbContext.OutgoingMessages.Add(new OutgoingMessage { Id = id, CreatedAt = DateTime.UtcNow });
-    await dbContext.SaveChangesAsync();
-
-    await publisher.PublishAsync(new OutgoingSms(client.Value.PhoneNumber, request.Text, id));
+    currentUser.Set(owner.Id);
+    await sender.Send(target, request);
 }).WithDescription("Service sends webhooks on this endpoint.");
 
 app.MapPost("/auth/code", async (LoginCodeService codes, HttpResponse response, LoginPhone request) =>

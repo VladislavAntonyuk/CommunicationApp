@@ -36,6 +36,7 @@ public sealed class BrokerTests(MosquittoFixture mosquitto) : IClassFixture<Mosq
             .WithTopicFilter(f => f.WithTopic(factory.Topic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
             .Build(), token);
 
+        TestTokens.SaveUser(factory.Services);
         var response = await factory.CreateClient().PostAsJsonAsync("/notify/Teams", new Message("Teams|1|hello"), token);
 
         response.EnsureSuccessStatusCode();
@@ -51,6 +52,7 @@ public sealed class BrokerTests(MosquittoFixture mosquitto) : IClassFixture<Mosq
     {
         var token = TestContext.Current.CancellationToken;
         await using var factory = new BrokerApiFactory(mosquitto.Broker.ToString());
+        TestTokens.SaveUser(factory.Services);
         var response = await factory.CreateClient().PostAsJsonAsync("/notify/Telegram", new Message("Telegram|1|hello"), token);
         response.EnsureSuccessStatusCode();
         var id = (await Messages(factory)).Single().Id;

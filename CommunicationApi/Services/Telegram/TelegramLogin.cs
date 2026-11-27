@@ -4,7 +4,7 @@ using WTelegram;
 
 namespace CommunicationApi.Services.Telegram;
 
-public sealed class TelegramLogin(IConfiguration configuration, ILogger<TelegramLogin> logger) : ITelegramLogin, IDisposable
+public sealed class TelegramLogin(int userId, IConfiguration configuration, ILogger<TelegramLogin> logger, Func<UpdateManager, Update, Task> onUpdate) : ITelegramLogin
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _state = new();
@@ -25,7 +25,11 @@ public sealed class TelegramLogin(IConfiguration configuration, ILogger<Telegram
             lock (_state)
             {
                 if (_client == null && ReceivingProviders.IsConfigured(Target.Telegram, configuration))
+                {
                     _client = new Client(Config);
+                    UpdateManager? manager = null;
+                    manager = _client.WithUpdateManager(update => onUpdate(manager!, update));
+                }
 
                 return _client;
             }
@@ -145,7 +149,9 @@ public sealed class TelegramLogin(IConfiguration configuration, ILogger<Telegram
         return _client!;
     }
 
-    public void Dispose()
+    public static string SessionPath(int userId) => Path.Combine(AppContext.BaseDirectory, $"telegram-{userId}.session");
+
+    public void Close()
     {
         _pending?.TrySetCanceled();
         _client?.Dispose();
@@ -244,7 +250,7 @@ public sealed class TelegramLogin(IConfiguration configuration, ILogger<Telegram
             case "api_hash":
                 return settings?.AppHash;
             case "session_pathname":
-                return Path.Combine(AppContext.BaseDirectory, "telegram.session");
+                return SessionPath(userId);
             case "user_id":
                 // Accept whichever account the saved session belongs to.
                 return "-1";

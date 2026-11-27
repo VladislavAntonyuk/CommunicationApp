@@ -1,4 +1,5 @@
 using CommunicationApi.Database;
+using CommunicationApi.Services.Auth;
 using CommunicationApi.Services.Email;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
@@ -57,7 +58,7 @@ public class ApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(_connectionString));
 
             services.AddSingleton<IEmailService>(Senders);
-            services.AddSingleton<ITelegramService>(Senders);
+            services.AddScoped(sp => Senders.ForUser(sp.GetRequiredService<ICurrentUser>()));
             services.AddSingleton<ITeamsService>(Senders);
             services.AddSingleton<ISlackService>(Senders);
             services.AddSingleton<ITelegramLogin>(TelegramLogin);

@@ -25,25 +25,35 @@ public sealed class TelegramLogins(IConfiguration configuration, ILoggerFactory 
             login.Close();
     }
 
-    private async Task OnUpdate(int userId, UpdateManager manager, Update update)
+    public static Shared.Api.Message? ToSms(Update update, IReadOnlyDictionary<long, ChatBase> chats, DateTime now, TimeSpan maxAge)
     {
         if (update is not UpdateNewMessage { message: TL.Message message } || message.flags.HasFlag(TL.Message.Flags.out_))
-            return;
+            return null;
+
+        if (now - message.date > maxAge)
+            return null;
 
         var kind = message.peer_id switch
         {
             PeerUser => ChatKind.Private,
-            PeerChannel peer when manager.Chats.TryGetValue(peer.channel_id, out var chat) && chat.IsChannel => ChatKind.Channel,
+            PeerChannel peer when chats.TryGetValue(peer.channel_id, out var chat) && chat.IsChannel => ChatKind.Channel,
             _ => ChatKind.Group
         };
+
+        return new Shared.Api.Message($"Telegram|{message.peer_id.ID}|{message.message}", message.peer_id.ID.ToString(), kind);
+    }
+
+    private async Task OnUpdate(int userId, UpdateManager manager, Update update)
+    {
+        var maxAge = configuration.GetSection("Telegram").Get<TelegramSettings>()!.MaxMessageAge;
+        if (ToSms(update, manager.Chats, DateTime.UtcNow, maxAge) is not { } sms)
+            return;
 
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
             scope.ServiceProvider.GetRequiredService<ICurrentUser>().Set(userId);
-            await scope.ServiceProvider.GetRequiredService<OutgoingSmsSender>().Send(
-                Target.Telegram,
-                new Shared.Api.Message($"Telegram|{message.peer_id.ID}|{message.message}", message.peer_id.ID.ToString(), kind));
+            await scope.ServiceProvider.GetRequiredService<OutgoingSmsSender>().Send(Target.Telegram, sms);
         }
         catch (Exception ex)
         {

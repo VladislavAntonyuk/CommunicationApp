@@ -5,6 +5,7 @@ namespace CommunicationApi.Database;
 // A provider without a row is enabled.
 public class ProviderSetting
 {
+    public int UserId { get; set; }
     public Target Target { get; set; }
     public required bool Enabled { get; set; }
 }

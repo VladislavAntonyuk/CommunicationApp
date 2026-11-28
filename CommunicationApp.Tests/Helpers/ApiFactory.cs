@@ -27,6 +27,7 @@ public class ApiFactory : WebApplicationFactory<Program>
     }
 
     public const string ClientPhoneNumber = "+380501234567";
+    public const string OtherPhoneNumber = "+380671234567";
 
     public FakeSenders Senders { get; } = new();
 

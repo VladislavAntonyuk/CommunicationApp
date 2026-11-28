@@ -7,7 +7,7 @@ public class ProviderSettingConfiguration : IEntityTypeConfiguration<ProviderSet
 {
     public void Configure(EntityTypeBuilder<ProviderSetting> builder)
     {
-        builder.HasKey(x => x.Target);
-        builder.Property(x => x.Target).ValueGeneratedNever();
+        builder.HasKey(x => new { x.UserId, x.Target });
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
     }
 }

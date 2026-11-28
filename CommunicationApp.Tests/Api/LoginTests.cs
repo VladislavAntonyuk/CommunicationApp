@@ -180,17 +180,17 @@ public sealed class LoginTests : ApiTest
     }
 
     private Task<HttpResponseMessage> Refresh(string refreshToken) =>
-        Client.PostAsJsonAsync("/auth/refresh", new RefreshRequest(refreshToken), Token);
+        AnonymousClient.PostAsJsonAsync("/auth/refresh", new RefreshRequest(refreshToken), Token);
 
     private async Task<string> RequestCode()
     {
         var before = Factory.Publisher.Sms.Count;
-        (await Client.PostAsJsonAsync("/auth/code", new LoginPhone(PhoneNumber), Token)).EnsureSuccessStatusCode();
+        (await AnonymousClient.PostAsJsonAsync("/auth/code", new LoginPhone(PhoneNumber), Token)).EnsureSuccessStatusCode();
         return Factory.Publisher.Sms[before].Text[^6..];
     }
 
     private Task<HttpResponseMessage> Login(string phoneNumber, string code) =>
-        Client.PostAsJsonAsync("/auth/login", new LoginRequest(phoneNumber, code), Token);
+        AnonymousClient.PostAsJsonAsync("/auth/login", new LoginRequest(phoneNumber, code), Token);
 
     private static string WrongCode(string code) => code == "000000" ? "111111" : "000000";
 

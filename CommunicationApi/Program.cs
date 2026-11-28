@@ -30,6 +30,8 @@ builder.Services.Configure<MqttSettings>(builder.Configuration.GetSection("Mqtt"
 builder.Services.Configure<ClientSettings>(builder.Configuration.GetSection("Client"));
 builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection("Auth"));
 builder.Services.AddScoped<LoginCodeService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddAuthentication(BearerTokenDefaults.AuthenticationScheme).AddBearerToken();
 builder.Services.AddAuthorization();
 builder.Services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(builder.Configuration.GetConnectionString("CommunicationApiDb")));
@@ -62,8 +64,11 @@ app.MapGet("/", () => {
     return "Created by DotNetChickUa. See demo video describing how to use the API: https://github.com/DotNetChickUa/CommunicationApp/blob/main/demo.mp4";
 });
 
-app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<ClientSettings> client, Target target, Shared.Api.Message request) =>
+app.MapPost("/notify/{target}", async (CommunicationApiDbContext dbContext, IPublisher publisher, IOptions<ClientSettings> client, ICurrentUser currentUser, Target target, Shared.Api.Message request) =>
 {
+    if (await dbContext.Users.FirstOrDefaultAsync(x => x.PhoneNumber == client.Value.PhoneNumber) is { } owner)
+        currentUser.Set(owner.Id);
+
     if (await dbContext.ProviderSettings.AnyAsync(x => x.Target == target && !x.Enabled))
         return;
 
@@ -135,14 +140,14 @@ protectedApi.MapGet("/providers",
     }).WithDescription("Providers that can receive messages, and whether receiving is switched on for each.");
 
 protectedApi.MapPut("/providers/{target}",
-    async (CommunicationApiDbContext dbContext, Target target, ProviderSwitch request) =>
+    async (CommunicationApiDbContext dbContext, ICurrentUser currentUser, Target target, ProviderSwitch request) =>
     {
         if (!ReceivingProviders.All.Contains(target))
             return Results.Problem($"{target} does not receive messages", statusCode: StatusCodes.Status400BadRequest);
 
         var setting = await dbContext.ProviderSettings.AsTracking().FirstOrDefaultAsync(x => x.Target == target);
         if (setting == null)
-            dbContext.ProviderSettings.Add(new ProviderSetting { Target = target, Enabled = request.Enabled });
+            dbContext.ProviderSettings.Add(new ProviderSetting { UserId = currentUser.RequiredId, Target = target, Enabled = request.Enabled });
         else
             setting.Enabled = request.Enabled;
 
@@ -174,14 +179,14 @@ protectedApi.MapGet("/providers/{target}/chats",
     }).WithDescription("Chats of a provider, and whether messages from each are received.");
 
 protectedApi.MapPut("/providers/{target}/chats/{chatId}",
-    async (CommunicationApiDbContext dbContext, Target target, string chatId, ProviderSwitch request) =>
+    async (CommunicationApiDbContext dbContext, ICurrentUser currentUser, Target target, string chatId, ProviderSwitch request) =>
     {
         if (target != Target.Telegram)
             return Results.Problem($"Chats cannot be chosen for {target}", statusCode: StatusCodes.Status400BadRequest);
 
         var setting = await dbContext.ChatSettings.AsTracking().FirstOrDefaultAsync(x => x.Target == target && x.ChatId == chatId);
         if (setting == null)
-            dbContext.ChatSettings.Add(new ChatSetting { Target = target, ChatId = chatId, Enabled = request.Enabled });
+            dbContext.ChatSettings.Add(new ChatSetting { UserId = currentUser.RequiredId, Target = target, ChatId = chatId, Enabled = request.Enabled });
         else
             setting.Enabled = request.Enabled;
 

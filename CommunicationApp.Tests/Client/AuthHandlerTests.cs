@@ -78,6 +78,7 @@ public sealed class AuthHandlerTests : IAsyncDisposable
         Assert.True(response.IsSuccessStatusCode);
         using var scope = _api.Services.CreateScope();
         var setting = await scope.ServiceProvider.GetRequiredService<CommunicationApiDbContext>().ProviderSettings
+            .IgnoreQueryFilters()
             .SingleAsync(TestContext.Current.CancellationToken);
         Assert.False(setting.Enabled);
     }

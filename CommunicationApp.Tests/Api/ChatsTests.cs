@@ -69,6 +69,17 @@ public sealed class ChatsTests : ApiTest
     }
 
     [Fact]
+    public async Task Put_SwitchChannelOn_OtherUserKeepsDefault()
+    {
+        var otherUser = Factory.CreateClient().Authorized(Factory.Services, ApiFactory.OtherPhoneNumber);
+        await Put("3", true);
+
+        var chats = await otherUser.GetFromJsonAsync<List<ChatStatus>>("/providers/Telegram/chats", TestContext.Current.CancellationToken) ?? [];
+
+        Assert.False(chats.Single(x => x.ChatId == "3").Enabled);
+    }
+
+    [Fact]
     public async Task Put_SwitchChannelOn_ItsMessagesArePublished()
     {
         await Put("3", true);

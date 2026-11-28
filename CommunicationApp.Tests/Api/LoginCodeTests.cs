@@ -106,13 +106,12 @@ public sealed class LoginCodeTests : ApiTest
     }
 
     [Fact]
-    public async Task OtherNumber_IsForbidden()
+    public async Task AnyNumber_GetsCode()
     {
-        var response = await RequestCode("+380671234567");
+        var response = await RequestCode(ApiFactory.OtherPhoneNumber);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        Assert.Empty(Factory.Publisher.Sms);
-        Assert.False(await InDb(db => db.LoginCodes.AnyAsync(Token)));
+        response.EnsureSuccessStatusCode();
+        Assert.Equal(ApiFactory.OtherPhoneNumber, Factory.Publisher.Sms.Single().To);
     }
 
     private Task<HttpResponseMessage> RequestCode(string phoneNumber) =>

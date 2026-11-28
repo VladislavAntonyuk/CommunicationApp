@@ -1,13 +1,14 @@
+using CommunicationApi.Services.Auth;
 using Shared.Api;
 using TL;
 
 namespace CommunicationApi.Services.Telegram;
 
-internal class TelegramService(TelegramLogin login) : ITelegramService
+internal class TelegramService(TelegramLogins logins, ICurrentUser currentUser) : ITelegramService
 {
     public async Task Send(string recipient, string text)
     {
-        var client = await login.GetLoggedInClient();
+        var client = await logins.For(currentUser.RequiredId).GetLoggedInClient();
         var id = long.Parse(recipient);
         var dialogs = await client.Messages_GetAllDialogs();
         InputPeer peer = dialogs.users.TryGetValue(id, out var user) ? user
@@ -18,7 +19,7 @@ internal class TelegramService(TelegramLogin login) : ITelegramService
 
     public async Task<List<TelegramChat>> GetChats()
     {
-        var client = await login.GetLoggedInClient();
+        var client = await logins.For(currentUser.RequiredId).GetLoggedInClient();
         var dialogs = await client.Messages_GetAllDialogs();
         var chats = new List<TelegramChat>();
         foreach (var dialog in dialogs.dialogs)

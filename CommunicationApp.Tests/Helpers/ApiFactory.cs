@@ -1,4 +1,6 @@
 using CommunicationApi.Database;
+using CommunicationApi.Services;
+using CommunicationApi.Services.Auth;
 using CommunicationApi.Services.Email;
 using CommunicationApi.Services.Slack;
 using CommunicationApi.Services.Teams;
@@ -12,6 +14,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Shared.Api;
 using Silverback.Messaging.Publishing;
 
 namespace CommunicationApp.Tests.Helpers;
@@ -35,6 +38,14 @@ public class ApiFactory : WebApplicationFactory<Program>
 
     public FakeMessagePublisher Publisher { get; } = new();
 
+    public async Task SendSms(Message message, string phoneNumber = ClientPhoneNumber)
+    {
+        var user = TestTokens.SaveUser(Services, phoneNumber);
+        await using var scope = Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ICurrentUser>().Set(user.Id);
+        await scope.ServiceProvider.GetRequiredService<OutgoingSmsSender>().Send(Target.Telegram, message);
+    }
+
     protected virtual void ConfigureMessaging(IServiceCollection services)
     {
         services.RemoveAll<IHostedService>();
@@ -44,7 +55,6 @@ public class ApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _connection.Open();
-        builder.UseSetting("Client:PhoneNumber", ClientPhoneNumber);
         builder.UseSetting("Auth:AllowedRegions:0", "UA");
         builder.UseSetting("Auth:AllowedRegions:1", "US");
 
@@ -57,7 +67,7 @@ public class ApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<CommunicationApiDbContext>(s => s.UseSqlite(_connectionString));
 
             services.AddSingleton<IEmailService>(Senders);
-            services.AddSingleton<ITelegramService>(Senders);
+            services.AddScoped(sp => Senders.ForUser(sp.GetRequiredService<ICurrentUser>()));
             services.AddSingleton<ITeamsService>(Senders);
             services.AddSingleton<ISlackService>(Senders);
             services.AddSingleton<ITelegramLogin>(TelegramLogin);

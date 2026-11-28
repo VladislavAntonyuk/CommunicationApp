@@ -11,6 +11,7 @@ public class IncomingSmsSubscriber(
     CommunicationApiDbContext dbContext,
     IncomingSmsRouter router,
     IOptions<AuthSettings> auth,
+    ICurrentUser currentUser,
     ILogger<IncomingSmsSubscriber> logger)
 {
     public async Task HandleAsync(IInboundEnvelope<IncomingSms> envelope)
@@ -22,11 +23,14 @@ public class IncomingSmsSubscriber(
         }
 
         var from = PhoneNumberNormalizer.ToE164(sms.From, auth.Value.DefaultRegion, auth.Value.AllowedRegions);
-        if (from == null || !await dbContext.Users.AnyAsync(x => x.PhoneNumber == from))
+        var user = from == null ? null : await dbContext.Users.FirstOrDefaultAsync(x => x.PhoneNumber == from);
+        if (user == null)
         {
             logger.LogWarning("Incoming SMS {Id} from an unknown number was ignored", id);
             return;
         }
+
+        currentUser.Set(user.Id);
 
         if (await dbContext.IncomingMessages.FindAsync(id) != null)
             return;

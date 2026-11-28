@@ -14,7 +14,7 @@ public sealed class ProvidersTests : ApiTest
     {
         var providers = await Get(Client);
 
-        Assert.Equal(new[] { Target.Telegram, Target.Slack }, providers.Select(x => x.Target).ToArray());
+        Assert.Equal(new[] { Target.Telegram }, providers.Select(x => x.Target).ToArray());
         Assert.All(providers, x => Assert.True(x.Enabled));
     }
 
@@ -27,33 +27,31 @@ public sealed class ProvidersTests : ApiTest
     }
 
     [Fact]
-    public async Task Put_SwitchOff_OnlyThatProviderIsDisabled()
+    public async Task Put_SwitchOff_ProviderIsDisabled()
     {
         await Put("Telegram", false);
 
-        var providers = await Get(Client);
-        Assert.False(providers.Single(x => x.Target == Target.Telegram).Enabled);
-        Assert.True(providers.Single(x => x.Target == Target.Slack).Enabled);
+        Assert.False((await Get(Client)).Single(x => x.Target == Target.Telegram).Enabled);
     }
 
     [Fact]
     public async Task Put_SwitchOffThenOn_ProviderIsEnabled()
     {
-        await Put("Slack", false);
+        await Put("Telegram", false);
 
-        await Put("Slack", true);
+        await Put("Telegram", true);
 
-        Assert.True((await Get(Client)).Single(x => x.Target == Target.Slack).Enabled);
+        Assert.True((await Get(Client)).Single(x => x.Target == Target.Telegram).Enabled);
     }
 
     [Fact]
     public async Task Put_SameValueTwice_Succeeds()
     {
-        await Put("Slack", false);
+        await Put("Telegram", false);
 
-        await Put("Slack", false);
+        await Put("Telegram", false);
 
-        Assert.False((await Get(Client)).Single(x => x.Target == Target.Slack).Enabled);
+        Assert.False((await Get(Client)).Single(x => x.Target == Target.Telegram).Enabled);
     }
 
     [Fact]
@@ -79,6 +77,7 @@ public sealed class ProvidersTests : ApiTest
     }
 
     [Theory]
+    [InlineData("Slack", "Slack does not receive messages")]
     [InlineData("Email", "Email does not receive messages")]
     [InlineData("Teams", "Teams does not receive messages")]
     [InlineData("99", "99 does not receive messages")]
@@ -118,61 +117,31 @@ public sealed class ProvidersTests : ApiTest
         Assert.Equal(expected, providers.Single(x => x.Target == Target.Telegram).Configured);
     }
 
-    [Theory]
-    [InlineData("xapp-1-token", true)]
-    [InlineData("<your app-level token here>", false)]
-    [InlineData("", false)]
-    public async Task Get_SlackConfigured_DependsOnSettings(string appLevelToken, bool expected)
-    {
-        var factory = Factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Slack:ApiToken", "token");
-            builder.UseSetting("Slack:AppLevelToken", appLevelToken);
-        });
-        var client = factory.CreateClient().Authorized(factory.Services);
-
-        var providers = await Get(client);
-
-        Assert.Equal(expected, providers.Single(x => x.Target == Target.Slack).Configured);
-    }
 
     [Fact]
-    public async Task Notify_ProviderSwitchedOff_MessageIsNotPublished()
+    public async Task Send_ProviderSwitchedOff_MessageIsNotPublished()
     {
         await Put("Telegram", false);
 
-        await Notify("Telegram", "Telegram|1|hello");
+        await Send("Telegram|1|hello");
 
         Assert.Empty(Factory.Publisher.Published);
     }
 
-    [Fact]
-    public async Task Notify_OtherProviderSwitchedOff_MessageIsPublished()
-    {
-        await Put("Telegram", false);
-
-        await Notify("Slack", "Slack|U1|hello");
-
-        Assert.Equal(new[] { "Slack|U1|hello" }, Factory.Publisher.Published);
-    }
 
     [Fact]
-    public async Task Notify_ProviderSwitchedBackOn_NewMessagesArePublished()
+    public async Task Send_ProviderSwitchedBackOn_NewMessagesArePublished()
     {
         await Put("Telegram", false);
-        await Notify("Telegram", "Telegram|1|while off");
+        await Send("Telegram|1|while off");
         await Put("Telegram", true);
 
-        await Notify("Telegram", "Telegram|1|after on");
+        await Send("Telegram|1|after on");
 
         Assert.Equal(new[] { "Telegram|1|after on" }, Factory.Publisher.Published);
     }
 
-    private async Task Notify(string target, string text)
-    {
-        var response = await Client.PostAsJsonAsync($"/notify/{target}", new Message(text), TestContext.Current.CancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
+    private Task Send(string text) => Factory.SendSms(new Message(text));
 
     private static async Task<List<ProviderStatus>> Get(HttpClient client)
     {

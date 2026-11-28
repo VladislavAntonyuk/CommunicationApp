@@ -62,13 +62,14 @@ public sealed class IncomingSmsTests(MosquittoFixture mosquitto) : IClassFixture
     public async Task OtherUser_IsSent()
     {
         await using var factory = await Start();
-        TestTokens.SaveUser(factory.Services, ApiFactory.OtherPhoneNumber);
+        var other = TestTokens.SaveUser(factory.Services, ApiFactory.OtherPhoneNumber);
         await Publish(factory, ApiFactory.OtherPhoneNumber, "Telegram|123|hello", "id1");
 
         var message = await WaitForResult(factory, "id1");
 
         Assert.True(message.Sent);
         Assert.Equal(["hello"], factory.Senders.Sent.Select(sent => sent.Text));
+        Assert.Equal([other.Id], factory.Senders.TelegramUsers);
     }
 
     [Fact]
